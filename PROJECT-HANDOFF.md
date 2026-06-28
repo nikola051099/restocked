@@ -178,8 +178,8 @@ full ~18 months the engine can use for seasonality.)
    Bridge script. Shopify's scanner can hit the exact App URL, so it may never see
    the CDN script. Fixed locally in `app/main.py`; also released Shopify config
    version `restocked-4` with `shopify app deploy`.
-   - Still required: commit/push the code, then Render **Manual Deploy -> Deploy
-     latest commit**. Verify `https://restocked.onrender.com/` contains
+   - Still required: Render **Manual Deploy -> Deploy latest commit** for GitHub
+     commit `3ada322`. Verify `https://restocked.onrender.com/` contains
      `shopify-api-key` and `shopifycloud/app-bridge.js`.
    - After deploy: open the app on the dev store in a **clean browser (no extensions /
      no ad blocker)**, interact for 2-3 min (load dashboard, Refresh, expand rows,
@@ -235,6 +235,6 @@ Optional / later:
 
 ## 9. One-line status
 
-Everything is built and the listing + submission are complete EXCEPT the app needs the
-2026-06-29 root-App-URL/App-Bridge fix deployed to Render. After that, trigger the
+Everything is built, pushed to GitHub, and the listing + submission are complete EXCEPT
+the app needs the 2026-06-29 root-App-URL/App-Bridge fix deployed to Render. After that, trigger the
 embedded checks again from a clean browser; once green, click **Submit for review**.
