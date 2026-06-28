@@ -23,9 +23,11 @@ from .forecasting import compute_recommendations, build_demo_payload
 from .billing import create_subscription, PLANS
 from .digest import run_digests
 from .webhooks import router as webhook_router
+from .legal import router as legal_router
 
 app = FastAPI(title="Variant Forecasting App")
 app.include_router(webhook_router)
+app.include_router(legal_router)
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 _SHOP_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9\-]*\.myshopify\.com$")

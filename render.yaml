@@ -12,6 +12,8 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
       - key: DATABASE_URL
         fromDatabase: { name: restocked-db, property: connectionString }
       - key: SHOPIFY_API_KEY
@@ -36,10 +38,12 @@ services:
   - type: cron
     name: restocked-refresh
     runtime: python
-    schedule: "0 5 * * *"          # daily 05:00 UTC
+    schedule: "0 5 * * *"
     buildCommand: pip install -r requirements.txt
     startCommand: python -m jobs.refresh_all
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
       - key: DATABASE_URL
         fromDatabase: { name: restocked-db, property: connectionString }
       - key: SHOPIFY_API_KEY
@@ -50,10 +54,12 @@ services:
   - type: cron
     name: restocked-digest
     runtime: python
-    schedule: "0 13 * * 1"         # Mondays 13:00 UTC
+    schedule: "0 13 * * 1"
     buildCommand: pip install -r requirements.txt
     startCommand: python -m jobs.send_digests
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
       - key: DATABASE_URL
         fromDatabase: { name: restocked-db, property: connectionString }
       - key: SHOPIFY_API_KEY
