@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="shopify-api-key" content="{{ api_key }}" />
+  {% if not demo %}<script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>{% endif %}
+  <title>Restocked — Reorder forecasting</title>
+  <style>
+    :root{
+      --bg:#f1f1f1; --surface:#fff; --ink:#303030; --sub:#616161; --hint:#8a8a8a;
+      --line:#e3e3e3; --line-2:#ebebeb; --hover:#fafafa;
+      --crit:#8e1b13; --crit-bg:#fff0ee; --crit-dot:#e0392b;
+      --warn:#5c4400; --warn-bg:#fff6e6; --warn-dot:#e6a417;
+      --ok:#0c5132; --ok-bg:#e7f4ec; --ok-dot:#29845a;
+      --focus:#005bd3; --radius:10px;
+    }
+    *{box-sizing:border-box;}
+    body{margin:0; background:var(--bg); color:var(--ink);
+      font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+      -webkit-font-smoothing:antialiased;}
+    .wrap{max-width:1120px; margin:0 auto; padding:20px 20px 48px;}
+    .topbar{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:18px;}
+    .title{font-size:19px; font-weight:600; margin:0; letter-spacing:-.01em; display:flex; align-items:center; gap:9px;}
+    .logo{width:26px; height:26px; border-radius:7px; background:var(--ink); color:#fff;
+      display:inline-flex; align-items:center; justify-content:center; font-size:14px; font-weight:700;}
+    .tag{font-size:11px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--ok);
+      background:var(--ok-bg); padding:3px 8px; border-radius:6px;}
+    .subtitle{font-size:13px; color:var(--sub); margin:3px 0 0 35px;}
+    .actions{display:flex; gap:8px; align-items:center;}
+    button{font:inherit; cursor:pointer; border-radius:8px; padding:8px 14px; font-weight:500;
+      border:1px solid var(--line); background:var(--surface); color:var(--ink); transition:.12s;}
+    button:hover{background:var(--hover); border-color:#d2d2d2;}
+    button:active{transform:translateY(.5px);}
+    button:disabled{opacity:.5; cursor:default; transform:none;}
+    button.primary{background:var(--ink); color:#fff; border-color:var(--ink);}
+    button.primary:hover{background:#1a1a1a;}
+    button:focus-visible, input:focus-visible, tr.row:focus-visible{outline:2px solid var(--focus); outline-offset:1px;}
+    tr.row:focus{outline:2px solid var(--focus); outline-offset:-2px;}
+    .cards{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px;}
+    .metric{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px;}
+    .metric .k{font-size:12px; color:var(--sub); display:flex; align-items:center; gap:6px; margin-bottom:6px;}
+    .metric .v{font-size:26px; font-weight:600; letter-spacing:-.02em;}
+    .metric .u{font-size:13px; color:var(--hint); font-weight:400; margin-left:4px;}
+    .dot{width:8px; height:8px; border-radius:50%; display:inline-block;}
+    .dot.crit{background:var(--crit-dot);} .dot.warn{background:var(--warn-dot);} .dot.ok{background:var(--ok-dot);}
+    .swatch{width:11px; height:11px; border-radius:3px; display:inline-block; border:1px solid rgba(0,0,0,.18); flex:none;}
+    .panel{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden;}
+    .toolbar{display:flex; align-items:center; gap:10px; padding:12px 14px; border-bottom:1px solid var(--line-2); flex-wrap:wrap;}
+    .search{position:relative; flex:1; min-width:180px;}
+    .search input{width:100%; border:1px solid var(--line); border-radius:8px; padding:8px 10px 8px 32px; font:inherit; background:#fcfcfc;}
+    .search svg{position:absolute; left:9px; top:9px; color:var(--hint);}
+    .seg{display:inline-flex; border:1px solid var(--line); border-radius:8px; overflow:hidden;}
+    .seg button{border:0; border-radius:0; padding:7px 12px; background:var(--surface); color:var(--sub); font-size:13px;}
+    .seg button + button{border-left:1px solid var(--line);}
+    .seg button.on{background:var(--ink); color:#fff;}
+    .lead{display:flex; align-items:center; gap:6px; font-size:13px; color:var(--sub);}
+    .lead input{width:56px; border:1px solid var(--line); border-radius:8px; padding:7px 8px; font:inherit; text-align:right;}
+    table{width:100%; border-collapse:collapse;}
+    thead th{position:sticky; top:0; background:#fbfbfb; text-align:left; font-size:11px; font-weight:600;
+      letter-spacing:.04em; text-transform:uppercase; color:var(--sub); padding:10px 14px; border-bottom:1px solid var(--line); white-space:nowrap;}
+    thead th.num{text-align:right;} thead th.sortable{cursor:pointer; user-select:none;}
+    thead th.sortable:hover{color:var(--ink);}
+    thead th .arr{color:var(--ink); margin-left:3px;}
+    tbody td{padding:11px 14px; border-bottom:1px solid var(--line-2); font-size:13.5px; vertical-align:middle;}
+    tbody td.num{text-align:right; font-variant-numeric:tabular-nums;}
+    tr.row{cursor:pointer;} tr.row:hover{background:var(--hover);}
+    .vcell{display:flex; align-items:center; gap:8px;}
+    .badge{display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; padding:3px 9px; border-radius:999px; white-space:nowrap;}
+    .badge.crit{background:var(--crit-bg); color:var(--crit);}
+    .badge.warn{background:var(--warn-bg); color:var(--warn);}
+    .badge.ok{background:var(--ok-bg); color:var(--ok);}
+    .variant{font-weight:500;}
+    .muted{color:var(--hint);}
+    .qty{font-weight:600;}
+    .why{background:#fbfbfb;}
+    .why td{padding:0 14px;}
+    .why .inner{padding:12px 0 14px; color:var(--sub); font-size:13px; line-height:1.6; border-top:1px dashed var(--line);}
+    .why .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin-top:10px;}
+    .why .kv{background:#fff; border:1px solid var(--line-2); border-radius:8px; padding:8px 10px;}
+    .why .kv .kk{font-size:11px; color:var(--hint); text-transform:uppercase; letter-spacing:.03em;}
+    .why .kv .vv{font-size:14px; font-weight:600; color:var(--ink);}
+    .foot{display:flex; align-items:center; justify-content:space-between; padding:11px 14px; font-size:13px; color:var(--sub); flex-wrap:wrap; gap:8px;}
+    .pager{display:flex; gap:6px;}
+    .pager button{padding:5px 11px;}
+    .state{padding:48px 24px; text-align:center; color:var(--sub);}
+    .state .big{font-size:15px; color:var(--ink); font-weight:500; margin-bottom:4px;}
+    .banner{display:flex; align-items:center; gap:10px; background:#fff8e6; border:1px solid #f1d488; color:#5c4400;
+      padding:10px 14px; border-radius:var(--radius); margin-bottom:14px; font-size:13px;}
+    .banner a{color:#5c4400; font-weight:600;}
+    .spin{display:inline-block; width:14px; height:14px; border:2px solid #c9c9c9; border-top-color:var(--ink);
+      border-radius:50%; animation:s .7s linear infinite; vertical-align:-2px;}
+    @keyframes s{to{transform:rotate(360deg)}}
+    @media (max-width:720px){
+      .cards{grid-template-columns:repeat(2,1fr);}
+      .hide-sm{display:none;}
+      .subtitle{margin-left:0;}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1 class="title"><span class="logo">R</span> Restocked
+          {% if demo %}<span class="tag">Demo</span>{% endif %}</h1>
+        <p class="subtitle">Size-level demand forecasting &amp; reorder planning</p>
+      </div>
+      <div class="actions">
+        <button id="exportBtn" onclick="exportCSV()" aria-label="Export to CSV">Export CSV</button>
+        <button class="primary" id="refreshBtn" onclick="refresh()">Refresh forecast</button>
+      </div>
+    </div>
+
+    {% if not plan and not demo %}
+    <div class="banner">
+      <span>You're on the free trial.</span>
+      <a href="/billing/subscribe?shop={{ shop }}&plan=growth">Choose a plan</a>
+      <span>to keep recommendations after it ends.</span>
+    </div>
+    {% endif %}
+
+    <div class="cards" id="cards"></div>
+
+    <div class="panel">
+      <div class="toolbar">
+        <div class="search">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="q" type="search" placeholder="Search size, color or product…" oninput="setQuery(this.value)" aria-label="Search recommendations" />
+        </div>
+        <div class="seg" id="filters" role="group" aria-label="Filter by urgency">
+          <button data-f="all" class="on" onclick="setFilter('all')">All</button>
+          <button data-f="imminent" onclick="setFilter('imminent')">Reorder now</button>
+          <button data-f="soon" onclick="setFilter('soon')">Soon</button>
+          <button data-f="ok" onclick="setFilter('ok')">Healthy</button>
+        </div>
+        <div class="lead">
+          <label for="lead">Lead time</label>
+          <input id="lead" type="number" min="1" max="365" step="1" onkeydown="if(event.key==='Enter')applyLead()" aria-label="Supplier lead time in days" />
+          <span>days</span>
+          <button onclick="applyLead()" id="leadBtn">Apply</button>
+        </div>
+      </div>
+
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr>
+            <th>Urgency</th>
+            <th>Variant</th>
+            <th class="hide-sm">Product</th>
+            <th class="num sortable" data-k="current_stock" onclick="setSort('current_stock')">Stock<span class="arr" data-arr="current_stock"></span></th>
+            <th class="num sortable" data-k="days_of_cover_left" onclick="setSort('days_of_cover_left')">Days left<span class="arr" data-arr="days_of_cover_left"></span></th>
+            <th class="num sortable hide-sm" data-k="avg_weekly_demand" onclick="setSort('avg_weekly_demand')">Forecast/wk<span class="arr" data-arr="avg_weekly_demand"></span></th>
+            <th class="num sortable hide-sm" data-k="size_curve_share" onclick="setSort('size_curve_share')">Share<span class="arr" data-arr="size_curve_share"></span></th>
+            <th class="num sortable" data-k="recommended_order_qty" onclick="setSort('recommended_order_qty')">Order<span class="arr" data-arr="recommended_order_qty"></span></th>
+          </tr></thead>
+          <tbody id="rows"><tr><td colspan="8" class="state"><span class="spin"></span> Loading…</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="foot">
+        <span id="count"></span>
+        <span id="assumptions" class="muted"></span>
+        <div class="pager" id="pager"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const CFG = { shop: {{ shop|tojson }}, demo: {{ demo|tojson }} };
+    const PAGE = 25;
+    let STATE = { all: [], meta:{}, q:"", filter:"all", sort:null, dir:-1, page:1 };
+    const RANK = { imminent:0, soon:1, ok:2 };
+    const LABEL = { imminent:"Reorder now", soon:"Order soon", ok:"Healthy" };
+    const CLS = { imminent:"crit", soon:"warn", ok:"ok" };
+    const SWATCH = {black:"#1a1a1a",white:"#ffffff",grey:"#9aa0a6",gray:"#9aa0a6",olive:"#6b8e23",
+      navy:"#1f2a44",blue:"#2c6ecb",red:"#c0392b",green:"#2e7d32",pink:"#e75480",purple:"#7a4ea3",
+      beige:"#d8c9a8",cream:"#f2e8d5",brown:"#8b5a2b",tan:"#c9a26b",yellow:"#e6b800",orange:"#e07b39",
+      charcoal:"#36454f",khaki:"#b3a06b",burgundy:"#7b2d3a",teal:"#1d8a8a",sand:"#dcc8a0"};
+
+    const fmt1 = n => (n==null||isNaN(n)) ? "—" : (Math.round(n*10)/10).toString();
+    const rnd  = n => (n==null||isNaN(n)) ? "—" : Math.round(n).toString();
+    const days = n => (n==null||isNaN(n)) ? "—" : (n>365 ? "365+" : (Math.round(n*10)/10).toString());
+
+    async function authHeaders(){
+      if(CFG.demo) return {};
+      try { return { "Authorization":"Bearer "+(await shopify.idToken()) }; }
+      catch(e){ return {}; }
+    }
+    const api = p => `${p}${p.includes('?')?'&':'?'}shop=${encodeURIComponent(CFG.shop)}`;
+    const esc = s => String(s==null?"":s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    function ago(iso){ if(!iso) return ""; const s=Math.max(0,(Date.now()-new Date(iso))/1000);
+      if(s<90) return "just now"; if(s<5400) return Math.round(s/60)+"m ago";
+      if(s<172800) return Math.round(s/3600)+"h ago"; return Math.round(s/86400)+"d ago"; }
+    function swatch(color){
+      const key=String(color||"").toLowerCase().trim();
+      const hex=SWATCH[key]; if(!hex) return "";
+      return `<span class="swatch" style="background:${hex}" aria-hidden="true"></span>`;
+    }
+
+    function setQuery(v){ STATE.q=v.trim().toLowerCase(); STATE.page=1; draw(); }
+    function setFilter(f){ STATE.filter=f; STATE.page=1;
+      document.querySelectorAll('#filters button').forEach(b=>b.classList.toggle('on', b.dataset.f===f)); draw(); }
+    function setSort(k){ if(STATE.sort===k){ STATE.dir*=-1; } else { STATE.sort=k; STATE.dir=-1; } STATE.page=1; draw(); }
+
+    function view(){
+      let r = STATE.all.slice();
+      if(STATE.filter!=='all') r = r.filter(x=>x.stockout_risk===STATE.filter);
+      if(STATE.q){ r = r.filter(x=>((x.size||'')+' '+(x.color||'')+' '+(x.product||'')).toLowerCase().includes(STATE.q)); }
+      if(STATE.sort){ r.sort((a,b)=>((a[STATE.sort]||0)-(b[STATE.sort]||0))*STATE.dir); }
+      else { r.sort((a,b)=> (RANK[a.stockout_risk]-RANK[b.stockout_risk]) || (b.recommended_order_qty-a.recommended_order_qty)); }
+      return r;
+    }
+
+    function drawCards(){
+      const a=STATE.all;
+      const c = k => a.filter(x=>x.stockout_risk===k).length;
+      const units = a.reduce((s,x)=>s+(x.recommended_order_qty||0),0);
+      document.getElementById('cards').innerHTML = [
+        ['Reorder now','crit',c('imminent'),'variants'],
+        ['Order soon','warn',c('soon'),'variants'],
+        ['Healthy','ok',c('ok'),'variants'],
+        ['Total units to order','',units,'units']
+      ].map(([k,d,v,u])=>`<div class="metric"><div class="k">${d?`<span class="dot ${d}"></span>`:''}${k}</div>
+        <div class="v">${v.toLocaleString()}<span class="u">${u}</span></div></div>`).join('');
+    }
+
+    function drawArrows(){
+      document.querySelectorAll('.arr').forEach(s=>{
+        s.textContent = (STATE.sort===s.dataset.arr) ? (STATE.dir===1?'▲':'▼') : '';
+      });
+    }
+
+    function draw(){
+      drawCards(); drawArrows();
+      const rows=document.getElementById('rows');
+      const r=view(); const m=STATE.meta;
+      document.getElementById('assumptions').textContent =
+        `Lead time ${m.lead_time_days||30}d · ${Math.round((m.service_level||0.95)*100)}% service level`;
+
+      if(!STATE.all.length){
+        rows.innerHTML=`<tr><td colspan="8" class="state"><div class="big">No recommendations yet</div>
+          Forecasts need a few weeks of sales history per variant. Once orders accrue, they'll appear here.</td></tr>`;
+        document.getElementById('count').textContent=''; document.getElementById('pager').innerHTML=''; return;
+      }
+      if(!r.length){
+        rows.innerHTML=`<tr><td colspan="8" class="state"><div class="big">No matches</div>Try a different search or filter.</td></tr>`;
+        document.getElementById('count').textContent=''; document.getElementById('pager').innerHTML=''; return;
+      }
+      const pages=Math.ceil(r.length/PAGE);
+      if(STATE.page>pages) STATE.page=pages;
+      const start=(STATE.page-1)*PAGE, slice=r.slice(start,start+PAGE);
+
+      rows.innerHTML='';
+      slice.forEach((x)=>{
+        const cl=CLS[x.stockout_risk];
+        const tr=document.createElement('tr'); tr.className='row'; tr.tabIndex=0;
+        tr.setAttribute('role','button'); tr.setAttribute('aria-expanded','false');
+        tr.setAttribute('aria-label',`${x.size||''} ${x.color||''}, ${LABEL[x.stockout_risk]}, reorder ${x.recommended_order_qty}. Activate for details.`);
+        tr.innerHTML=
+          `<td><span class="badge ${cl}"><span class="dot ${cl}"></span>${LABEL[x.stockout_risk]}</span></td>
+           <td><span class="vcell">${swatch(x.color)}<span class="variant">${esc(x.size)||'—'} · ${esc(x.color)||'—'}</span></span></td>
+           <td class="hide-sm muted">${esc(x.product)||'—'}</td>
+           <td class="num">${rnd(x.current_stock)}</td>
+           <td class="num">${days(x.days_of_cover_left)}</td>
+           <td class="num hide-sm">${fmt1(x.avg_weekly_demand)}</td>
+           <td class="num hide-sm">${Math.round((x.size_curve_share||0)*100)}%</td>
+           <td class="num qty">${rnd(x.recommended_order_qty)}</td>`;
+        const wr=document.createElement('tr'); wr.className='why'; wr.style.display='none';
+        wr.innerHTML=`<td colspan="8"><div class="inner">${esc(x.reasoning)}
+          <div class="grid">
+            <div class="kv"><div class="kk">Forecast / week</div><div class="vv">${fmt1(x.avg_weekly_demand)}</div></div>
+            <div class="kv"><div class="kk">Safety stock</div><div class="vv">${rnd(x.safety_stock)}</div></div>
+            <div class="kv"><div class="kk">Reorder point</div><div class="vv">${rnd(x.reorder_point)}</div></div>
+            <div class="kv"><div class="kk">Method</div><div class="vv" style="font-size:12px;">${esc(x.method)||'—'}</div></div>
+          </div></div></td>`;
+        const toggle=()=>{const open=wr.style.display!=='none'; wr.style.display=open?'none':'table-row'; tr.setAttribute('aria-expanded',String(!open));};
+        tr.onclick=toggle;
+        tr.onkeydown=(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); toggle(); } };
+        rows.appendChild(tr); rows.appendChild(wr);
+      });
+
+      document.getElementById('count').textContent =
+        `Showing ${start+1}–${start+slice.length} of ${r.length}` +
+        (m.computed_at?` · updated ${ago(m.computed_at)}`:'');
+      const pg=document.getElementById('pager');
+      pg.innerHTML = pages>1
+        ? `<button ${STATE.page<=1?'disabled':''} onclick="go(-1)">Previous</button>
+           <button ${STATE.page>=pages?'disabled':''} onclick="go(1)">Next</button>` : '';
+    }
+    function go(d){ STATE.page+=d; draw(); }
+
+    function ingest(data){
+      STATE.all=(data&&data.recommendations)||[];
+      STATE.meta=data||{};
+      const lead=document.getElementById('lead'); if(!lead.value) lead.value=data.lead_time_days||30;
+      draw();
+      if(data && data.is_apparel===false){
+        document.getElementById('assumptions').textContent='Heads up: this store doesn’t look size-based.';
+      }
+    }
+
+    async function load(){
+      try{ const r=await fetch(api('/api/recommendations'),{headers:await authHeaders()});
+        if(!r.ok) throw new Error('HTTP '+r.status); ingest(await r.json()); }
+      catch(e){ document.getElementById('rows').innerHTML=
+        `<tr><td colspan="8" class="state"><div class="big">Couldn’t load</div>${esc(e.message)}</td></tr>`; }
+    }
+    async function refresh(extra){
+      const b=document.getElementById('refreshBtn'); b.disabled=true; b.innerHTML='<span class="spin"></span> Refreshing…';
+      document.getElementById('rows').innerHTML=`<tr><td colspan="8" class="state"><span class="spin"></span> Crunching your sales history…</td></tr>`;
+      try{ const r=await fetch(api('/api/refresh'+(extra||'')),{method:'POST',headers:await authHeaders()});
+        if(!r.ok) throw new Error('HTTP '+r.status); ingest(await r.json()); }
+      catch(e){ document.getElementById('rows').innerHTML=
+        `<tr><td colspan="8" class="state"><div class="big">Refresh failed</div>${esc(e.message)}</td></tr>`; }
+      finally{ b.disabled=false; b.textContent='Refresh forecast'; }
+    }
+    function applyLead(){
+      const el=document.getElementById('lead'); const v=parseInt(el.value,10);
+      if(!(v>=1&&v<=365)){ el.focus(); el.select(); return; }
+      refresh('&lead_time='+v);
+    }
+    function exportCSV(){
+      const r=view(); if(!r.length) return;
+      const head=['Urgency','Size','Color','Product','In stock','Days left','Forecast/wk','Size share %','Reorder qty'];
+      const lines=[head.join(',')].concat(r.map(x=>[
+        LABEL[x.stockout_risk], x.size, x.color, (x.product||''),
+        Math.round(x.current_stock), days(x.days_of_cover_left), fmt1(x.avg_weekly_demand),
+        Math.round((x.size_curve_share||0)*100), Math.round(x.recommended_order_qty)
+      ].map(c=>`"${String(c==null?'':c).replace(/"/g,'""')}"`).join(',')));
+      const blob=new Blob([lines.join('\n')],{type:'text/csv'});
+      const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+      a.download='reorder-recommendations.csv'; a.click(); URL.revokeObjectURL(a.href);
+    }
+
+    load();
+  </script>
+</body>
+</html>
