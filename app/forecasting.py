@@ -109,4 +109,12 @@ def build_demo_payload(lead_time_days: int | None = None) -> dict:
     avg8 = recent.groupby("variant_id")["quantity"].sum() / 8.0
     variants_df["current_stock"] = variants_df["variant_id"].map(
         lambda v: int(round(float(avg8.get(v, 0.0)) * 2)))
-    varian
+    variants_df.loc[variants_df.variant_id == stockout_vid, "current_stock"] = 3
+
+    out = _run(orders_df, variants_df, lead_time_days)
+    # nicer product label for the demo
+    for r in out["recommendations"]:
+        r["product"] = "Heavyweight Hoodie"
+    out["computed_for"] = "demo-store.myshopify.com"
+    out["demo"] = True
+    return out
