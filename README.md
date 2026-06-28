@@ -39,6 +39,7 @@ app/
   (Render Cron Job / GitHub Actions), or add APScheduler.
 
 ## Tests
+- `python -m pytest` - app/API/auth/digest test suite.
 - `cd forecasting_engine && python test_engine.py` — engine sanity checks.
 - `python test_data_mapping.py` — confirms Shopify payloads feed the engine.
 

@@ -18,7 +18,10 @@ from datetime import date, timedelta
 import numpy as np
 import pandas as pd
 
-from engine import ForecastEngine, ForecastConfig
+try:
+    from .engine import ForecastEngine, ForecastConfig
+except ImportError:  # Allow `python test_engine.py` from this folder.
+    from engine import ForecastEngine, ForecastConfig
 
 RNG = np.random.default_rng(42)
 

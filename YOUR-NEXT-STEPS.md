@@ -50,5 +50,5 @@ webhooks — all implemented). Expect 1–2 rounds of small fixes. Resubmit and 
 - Full Shopify app: OAuth, embedded dashboard, Admin API pull, billing, GDPR webhooks.
 - Session-token auth + CSP (the two most common review rejections) — handled.
 - Adjustable lead time, CSV export, search/filter/sort, weekly email digest.
-- Deploy config (render.yaml, Procfile), nightly jobs, automated test suite (16 tests).
+- Deploy config (render.yaml, Procfile), nightly jobs, automated test suite (17 tests).
 - Listing copy, landing page, this guide.

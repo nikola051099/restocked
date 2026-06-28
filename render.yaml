@@ -50,6 +50,8 @@ services:
         sync: false
       - key: SHOPIFY_API_SECRET
         sync: false
+      - key: APP_URL
+        sync: false
 
   - type: cron
     name: restocked-digest
@@ -65,6 +67,8 @@ services:
       - key: SHOPIFY_API_KEY
         sync: false
       - key: SHOPIFY_API_SECRET
+        sync: false
+      - key: APP_URL
         sync: false
       - key: SMTP_HOST
         sync: false

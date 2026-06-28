@@ -37,6 +37,28 @@ def _valid_shop(shop): return bool(shop and _SHOP_RE.match(shop))
 def _clean_lead_time(v): return v if (v and 1 <= v <= 365) else None
 
 
+def _open_from_admin_html() -> str:
+    bridge = "" if settings.DEMO else (
+        f'  <meta name="shopify-api-key" content="{settings.API_KEY}" />\n'
+        '  <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>\n'
+    )
+    return (
+        "<!doctype html>\n"
+        "<html lang=\"en\">\n"
+        "<head>\n"
+        "  <meta charset=\"utf-8\" />\n"
+        "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n"
+        f"{bridge}"
+        "  <title>Restocked</title>\n"
+        "</head>\n"
+        "<body>\n"
+        "  <h3>Open this app from your Shopify admin.</h3>\n"
+        "  <p>Or append <code>?shop=yourstore.myshopify.com</code>.</p>\n"
+        "</body>\n"
+        "</html>\n"
+    )
+
+
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     resp = await call_next(request)
@@ -88,8 +110,7 @@ async def dashboard(request: Request, shop: str | None = None):
     if settings.DEMO and not shop:
         shop = "demo-store.myshopify.com"
     if not _valid_shop(shop):
-        return HTMLResponse("<h3>Open this app from your Shopify admin.</h3>"
-                            "<p>Or append <code>?shop=yourstore.myshopify.com</code>.</p>")
+        return HTMLResponse(_open_from_admin_html())
     if not settings.DEMO and not store.get(shop).get("token"):
         return RedirectResponse(f"/install?shop={shop}")
     return templates.TemplateResponse(request, "dashboard.html", {

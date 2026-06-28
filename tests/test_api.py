@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from app.config import settings
 from app.main import app
 
 c = TestClient(app)
@@ -13,6 +14,13 @@ def test_security_header_present():
 def test_dashboard_renders_demo():
     r = c.get("/?shop=demo-store.myshopify.com")
     assert r.status_code == 200 and "Restocked" in r.text
+
+def test_root_fallback_includes_app_bridge_for_scanner(monkeypatch):
+    monkeypatch.setattr(settings, "DEMO", False)
+    r = c.get("/")
+    assert r.status_code == 200
+    assert 'meta name="shopify-api-key"' in r.text
+    assert "cdn.shopify.com/shopifycloud/app-bridge.js" in r.text
 
 def test_recommendations_demo():
     r = c.get("/api/recommendations?shop=demo-store.myshopify.com")

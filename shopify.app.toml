@@ -1,15 +1,9 @@
-# Shopify app configuration. Link with: shopify app config link
-# Then push (incl. compliance webhooks) with: shopify app deploy
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
 client_id = "20cd42154163ff5f21ff163f882dcc01"
 name = "Restocked"
 application_url = "https://restocked.onrender.com"
 embedded = true
-
-[access_scopes]
-scopes = "read_orders,read_products,read_inventory"
-
-[auth]
-redirect_urls = [ "https://restocked.onrender.com/auth/callback" ]
 
 [webhooks]
 api_version = "2026-04"
@@ -18,3 +12,12 @@ api_version = "2026-04"
   customer_deletion_url = "https://restocked.onrender.com/webhooks/customers/redact"
   customer_data_request_url = "https://restocked.onrender.com/webhooks/customers/data_request"
   shop_deletion_url = "https://restocked.onrender.com/webhooks/shop/redact"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_inventory,read_orders,read_products"
+optional_scopes = [ ]
+use_legacy_install_flow = true
+
+[auth]
+redirect_urls = [ "https://restocked.onrender.com/auth/callback" ]
