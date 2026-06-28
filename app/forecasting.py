@@ -35,8 +35,22 @@ async def compute_recommendations(shop: str, token: str,
                                   lead_time_days: int | None = None) -> dict:
     api = AdminAPI(shop, token)
     since = (date.today() - timedelta(days=550)).isoformat()  # ~18 months
-    order_nodes = await api.fetch_orders(since)
-    variant_nodes = await api.fetch_variants()
+
+    def _sample() -> dict:
+        s = build_demo_payload(lead_time_days)
+        s["sample"] = True
+        s["computed_for"] = shop
+        return s
+
+    # Order data may be inaccessible (e.g. protected customer data approval
+    # still pending) or the API may error transiently. In that case show a
+    # labelled sample preview instead of failing.
+    try:
+        order_nodes = await api.fetch_orders(since)
+        variant_nodes = await api.fetch_variants()
+    except Exception:
+        return _sample()
+
     orders_df = data_mapping.orders_to_df(order_nodes)
     variants_df = data_mapping.variants_to_df(variant_nodes)
     out = _run(orders_df, variants_df, lead_time_days)
@@ -44,10 +58,7 @@ async def compute_recommendations(shop: str, token: str,
     # New store with no sales history: show a labelled sample so the merchant
     # (and app reviewers) can preview Restocked instead of an empty table.
     if out.get("n_order_lines", 0) == 0:
-        sample = build_demo_payload(lead_time_days)
-        sample["sample"] = True
-        sample["computed_for"] = shop
-        return sample
+        return _sample()
     try:
         out["shop_email"] = await api.fetch_shop_email()
     except Exception:
