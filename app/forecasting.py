@@ -41,6 +41,13 @@ async def compute_recommendations(shop: str, token: str,
     variants_df = data_mapping.variants_to_df(variant_nodes)
     out = _run(orders_df, variants_df, lead_time_days)
     out["computed_for"] = shop
+    # New store with no sales history: show a labelled sample so the merchant
+    # (and app reviewers) can preview Restocked instead of an empty table.
+    if out.get("n_order_lines", 0) == 0:
+        sample = build_demo_payload(lead_time_days)
+        sample["sample"] = True
+        sample["computed_for"] = shop
+        return sample
     try:
         out["shop_email"] = await api.fetch_shop_email()
     except Exception:
@@ -91,12 +98,4 @@ def build_demo_payload(lead_time_days: int | None = None) -> dict:
     avg8 = recent.groupby("variant_id")["quantity"].sum() / 8.0
     variants_df["current_stock"] = variants_df["variant_id"].map(
         lambda v: int(round(float(avg8.get(v, 0.0)) * 2)))
-    variants_df.loc[variants_df.variant_id == stockout_vid, "current_stock"] = 3
-
-    out = _run(orders_df, variants_df, lead_time_days)
-    # nicer product label for the demo
-    for r in out["recommendations"]:
-        r["product"] = "Heavyweight Hoodie"
-    out["computed_for"] = "demo-store.myshopify.com"
-    out["demo"] = True
-    return out
+    varian

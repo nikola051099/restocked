@@ -120,6 +120,10 @@
     </div>
     {% endif %}
 
+    <div class="banner" id="sampleBanner" style="display:none;">
+      <span>Showing <strong>sample data</strong> so you can preview Restocked. Your store's own forecast appears automatically once it has a few weeks of order history.</span>
+    </div>
+
     <div class="cards" id="cards"></div>
 
     <div class="panel">
@@ -295,7 +299,10 @@
       STATE.meta=data||{};
       const lead=document.getElementById('lead'); if(!lead.value) lead.value=data.lead_time_days||30;
       draw();
-      if(data && data.is_apparel===false){
+      const sb=document.getElementById('sampleBanner');
+      if(sb) sb.style.display = (data && data.sample) ? 'flex' : 'none';
+      if(data && data.sample===true){ /* sample preview for empty stores */ }
+      else if(data && data.is_apparel===false){
         document.getElementById('assumptions').textContent='Heads up: this store doesn’t look size-based.';
       }
     }
@@ -325,15 +332,4 @@
       const head=['Urgency','Size','Color','Product','In stock','Days left','Forecast/wk','Size share %','Reorder qty'];
       const lines=[head.join(',')].concat(r.map(x=>[
         LABEL[x.stockout_risk], x.size, x.color, (x.product||''),
-        Math.round(x.current_stock), days(x.days_of_cover_left), fmt1(x.avg_weekly_demand),
-        Math.round((x.size_curve_share||0)*100), Math.round(x.recommended_order_qty)
-      ].map(c=>`"${String(c==null?'':c).replace(/"/g,'""')}"`).join(',')));
-      const blob=new Blob([lines.join('\n')],{type:'text/csv'});
-      const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-      a.download='reorder-recommendations.csv'; a.click(); URL.revokeObjectURL(a.href);
-    }
-
-    load();
-  </script>
-</body>
-</html>
+        Math.round(x.current_stock), days(x.days_of_cover_left), 
