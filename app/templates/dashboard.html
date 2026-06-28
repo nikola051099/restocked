@@ -325,7 +325,7 @@
     function applyLead(){
       const el=document.getElementById('lead'); const v=parseInt(el.value,10);
       if(!(v>=1&&v<=365)){ el.focus(); el.select(); return; }
-      refresh('&lead_time='+v);
+      refresh('?lead_time='+v);
     }
     function exportCSV(){
       const r=view(); if(!r.length) return;
