@@ -25,10 +25,13 @@ and the app installed on your dev store from the live URL.
 
 ## Step 5 — Billing & listing
 1. Decide final prices (defaults: $19 / $39 / $79, 14-day trial). These are set
-   in the Partner dashboard / via the Billing API already wired in `app/billing.py`.
-2. Pay the one-time $19 App Store listing fee.
-3. Fill the listing using `listing-copy.md`. Capture the 4 screenshots listed there.
-4. Provide a privacy policy URL and support email (required).
+   in the Partner Dashboard with Shopify App Pricing; `app/billing.py` redirects
+   merchants to Shopify's hosted plan-selection page.
+2. Set each plan's welcome/redirect link to `/billing/callback` or
+   `https://<your-app>/billing/callback`.
+3. Pay the one-time $19 App Store listing fee.
+4. Fill the listing using `listing-copy.md`. Capture the 4 screenshots listed there.
+5. Provide a privacy policy URL and support email (required).
 
 ## Step 6 — Submit for review (then wait 3–10 business days)
 Shopify runs automated checks first (OAuth, embedded session tokens, GDPR
@@ -50,5 +53,5 @@ webhooks — all implemented). Expect 1–2 rounds of small fixes. Resubmit and 
 - Full Shopify app: OAuth, embedded dashboard, Admin API pull, billing, GDPR webhooks.
 - Session-token auth + CSP (the two most common review rejections) — handled.
 - Adjustable lead time, CSV export, search/filter/sort, weekly email digest.
-- Deploy config (render.yaml, Procfile), nightly jobs, automated test suite (17 tests).
+- Deploy config (render.yaml, Procfile), nightly jobs, automated test suite.
 - Listing copy, landing page, this guide.

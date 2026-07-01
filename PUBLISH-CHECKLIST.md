@@ -32,9 +32,12 @@ Every step to go from code to a live, paid Shopify app. Marked **[YOU]** (only y
 - [YOU] Add the nightly forecast cron (instructions in README).
 
 ## Phase 4 — Billing (you confirm, [DONE] code)
-- [DONE] Shopify Billing API recurring-charge code (`app/billing.py`).
+- [DONE] Shopify App Pricing redirect code (`app/billing.py`) for the hosted
+  plan-selection page.
 - [YOU] Decide final prices (suggested $19 / $39 / $79). Set a free trial (14 days).
-- [YOU] Test the charge flow on the dev store (Shopify provides test charges).
+- [YOU] In Partner Dashboard pricing, set each plan's welcome/redirect link to
+  `/billing/callback` or `https://<your-app>/billing/callback`.
+- [YOU] Test the hosted plan-selection flow on the dev store.
 
 ## Phase 5 — Listing (you write, I can draft)
 - [YOU] In Partners → Distribution → choose **Shopify App Store** listing.

@@ -20,7 +20,7 @@ from . import shopify_client as sc
 from .auth import require_shop
 from .store import store
 from .forecasting import compute_recommendations, build_demo_payload
-from .billing import create_subscription, PLANS
+from .billing import pricing_page_url, PLANS
 from .digest import run_digests
 from .webhooks import router as webhook_router
 from .legal import router as legal_router
@@ -35,6 +35,9 @@ _SHOP_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9\-]*\.myshopify\.com$")
 
 def _valid_shop(shop): return bool(shop and _SHOP_RE.match(shop))
 def _clean_lead_time(v): return v if (v and 1 <= v <= 365) else None
+def _legacy_sample_payload(data: dict) -> bool:
+    last_run = data.get("last_run")
+    return isinstance(last_run, dict) and last_run.get("sample") is True
 
 
 def _open_from_admin_html() -> str:
@@ -128,7 +131,7 @@ async def api_recommendations(shop: str = Depends(require_shop)):
     data = store.get(shop)
     if not data.get("token"):
         raise HTTPException(401, "Not installed")
-    if data.get("last_run"):
+    if data.get("last_run") and not _legacy_sample_payload(data):
         return JSONResponse(data["last_run"])
     result = await compute_recommendations(shop, data["token"], data.get("lead_time_days"))
     data["last_run"] = result; data["email"] = result.get("shop_email") or data.get("email")
@@ -192,16 +195,21 @@ async def billing_subscribe(shop: str, plan: str):
         raise HTTPException(400, "Bad request")
     if settings.DEMO:
         return RedirectResponse(f"/?shop={shop}")
-    token = store.get(shop).get("token")
-    if not token:
-        raise HTTPException(401, "Not installed")
-    return_url = f"{settings.APP_URL}/billing/callback?shop={shop}&plan={plan}"
-    return RedirectResponse(await create_subscription(shop, token, plan, return_url))
+    return RedirectResponse(pricing_page_url(shop))
 
 
 @app.get("/billing/callback")
-async def billing_callback(shop: str, plan: str):
-    if not _valid_shop(shop) or plan not in PLANS:
-        raise HTTPException(400, "Bad request")
-    store.update(shop, plan=plan)
+async def billing_callback(
+    shop: str | None = None,
+    plan: str | None = None,
+    plan_handle: str | None = None,
+    shop_domain: str | None = None,
+    myshopify_domain: str | None = None,
+):
+    shop = shop or shop_domain or myshopify_domain
+    if not _valid_shop(shop):
+        return RedirectResponse("/")
+    selected_plan = plan_handle or plan
+    if selected_plan:
+        store.update(shop, plan=selected_plan)
     return RedirectResponse(f"/?shop={shop}")

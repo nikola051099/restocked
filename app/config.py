@@ -10,6 +10,7 @@ class Settings:
     API_SECRET: str = os.getenv("SHOPIFY_API_SECRET", "")
     SCOPES: str = os.getenv("SHOPIFY_SCOPES", "read_orders,read_products,read_inventory")
     APP_URL: str = os.getenv("APP_URL", "http://localhost:8000").rstrip("/")
+    APP_HANDLE: str = (os.getenv("SHOPIFY_APP_HANDLE") or "restocked-size-forecasting").strip()
     APP_SECRET: str = os.getenv("APP_SECRET", "dev-insecure-secret")
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
     DEFAULT_LEAD_TIME_DAYS: int = int(os.getenv("DEFAULT_LEAD_TIME_DAYS", "30"))
@@ -18,7 +19,7 @@ class Settings:
     # so you can open it locally and click around. NEVER enable in production.
     DEMO: bool = os.getenv("DEMO", "0") == "1"
 
-    API_VERSION: str = "2024-07"
+    API_VERSION: str = os.getenv("SHOPIFY_API_VERSION", "2026-04")
 
     # Shared secret the scheduler sends (header X-Cron-Secret) to run jobs.
     CRON_SECRET: str = os.getenv("CRON_SECRET", "")

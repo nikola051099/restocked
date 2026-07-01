@@ -31,34 +31,79 @@ def _run(orders_df, variants_df, lead_time_days: int | None) -> dict:
     }
 
 
+def _empty_payload(
+    shop: str,
+    lead_time_days: int | None,
+    title: str,
+    message: str,
+    variants_df: pd.DataFrame | None = None,
+    orders_df: pd.DataFrame | None = None,
+    sync_status: str = "empty",
+) -> dict:
+    cfg = ForecastConfig(lead_time_days=lead_time_days or settings.DEFAULT_LEAD_TIME_DAYS)
+    variants_df = variants_df if variants_df is not None else pd.DataFrame()
+    orders_df = orders_df if orders_df is not None else pd.DataFrame()
+    return {
+        "recommendations": [],
+        "is_apparel": data_mapping.is_apparel_like(variants_df) if not variants_df.empty else None,
+        "n_variants": int(variants_df["variant_id"].nunique()) if not variants_df.empty else 0,
+        "n_order_lines": int(len(orders_df)),
+        "lead_time_days": cfg.lead_time_days,
+        "service_level": cfg.service_level,
+        "computed_at": datetime.now(timezone.utc).isoformat(),
+        "computed_for": shop,
+        "sample": False,
+        "sync_status": sync_status,
+        "sync_title": title,
+        "sync_message": message,
+    }
+
+
 async def compute_recommendations(shop: str, token: str,
                                   lead_time_days: int | None = None) -> dict:
     api = AdminAPI(shop, token)
     since = (date.today() - timedelta(days=550)).isoformat()  # ~18 months
 
-    def _sample() -> dict:
-        s = build_demo_payload(lead_time_days)
-        s["sample"] = True
-        s["computed_for"] = shop
-        return s
-
-    # Order data may be inaccessible (e.g. protected customer data approval
-    # still pending) or the API may error transiently. In that case show a
-    # labelled sample preview instead of failing.
     try:
-        order_nodes = await api.fetch_orders(since)
         variant_nodes = await api.fetch_variants()
     except Exception:
-        return _sample()
+        return _empty_payload(
+            shop,
+            lead_time_days,
+            "Product sync unavailable",
+            "Restocked could not read this store's Shopify products and variants yet. Confirm the app is installed with product and inventory permissions, then refresh the forecast.",
+            sync_status="variants_unavailable",
+        )
+
+    variants_df = data_mapping.variants_to_df(variant_nodes)
+    try:
+        order_nodes = await api.fetch_orders(since)
+    except Exception:
+        return _empty_payload(
+            shop,
+            lead_time_days,
+            "Order history unavailable",
+            "Restocked synced products and variants, but Shopify order history is not available to the app yet. Recommendations will appear after order access is approved and the store has sales history for its variants.",
+            variants_df=variants_df,
+            sync_status="orders_unavailable",
+        )
 
     orders_df = data_mapping.orders_to_df(order_nodes)
-    variants_df = data_mapping.variants_to_df(variant_nodes)
+    if orders_df.empty:
+        return _empty_payload(
+            shop,
+            lead_time_days,
+            "No order history yet",
+            "Restocked synced this store's products and variants, but there are no Shopify order lines available for forecasting yet. Recommendations will appear after the store has sales history for its variants.",
+            variants_df=variants_df,
+            orders_df=orders_df,
+            sync_status="no_order_history",
+        )
+
     out = _run(orders_df, variants_df, lead_time_days)
     out["computed_for"] = shop
-    # New store with no sales history: show a labelled sample so the merchant
-    # (and app reviewers) can preview Restocked instead of an empty table.
-    if out.get("n_order_lines", 0) == 0:
-        return _sample()
+    out["sample"] = False
+    out["sync_status"] = "ok"
     try:
         out["shop_email"] = await api.fetch_shop_email()
     except Exception:

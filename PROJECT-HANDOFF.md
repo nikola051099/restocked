@@ -3,7 +3,7 @@
 A complete brief of what this project is, what was built, where everything lives,
 what's done, and what's left. Written so a new person (or AI) can pick it up cold.
 
-_Last updated: 2026-06-28._
+_Last updated: 2026-07-01._
 
 ---
 
@@ -85,13 +85,15 @@ session-token auth).
 - **app/auth.py** — `verify_session_token` (manual HS256 JWT), `require_shop` dependency.
 - **app/data_mapping.py** — `orders_to_df`, `variants_to_df` (size/color from
   selectedOptions), `is_apparel_like`.
-- **app/forecasting.py** — `compute_recommendations` (pulls ~550 days of orders, runs
-  engine; **falls back to a labelled sample dataset** when order data is inaccessible
-  or the store has no history), `build_demo_payload` (synthetic hoodie data).
+- **app/forecasting.py** — `compute_recommendations` (pulls ~550 days of orders,
+  syncs variants first, runs the engine, and returns accurate empty sync states
+  when Shopify products/orders are unavailable or the store has no order history),
+  `build_demo_payload` (synthetic hoodie data for local/demo mode only).
 - **app/config.py** — env-var settings.
 - **app/store.py** — `Store` (Postgres via SQLAlchemy, or in-memory fallback).
 - **app/billing.py** — PLANS (starter $19 / growth $39 / pro $79), TRIAL_DAYS=14,
-  `create_subscription` (appSubscriptionCreate).
+  and Shopify App Pricing helpers that redirect merchants to Shopify's hosted
+  plan-selection page.
 - **app/webhooks.py** — mandatory GDPR webhooks: `/webhooks/app/uninstalled`,
   `/customers/data_request`, `/customers/redact`, `/shop/redact` (HMAC-verified).
 - **app/legal.py** — `/privacy` and `/terms` pages.
@@ -115,14 +117,20 @@ session-token auth).
 - App Bridge script loads from `https://cdn.shopify.com/shopifycloud/app-bridge.js`;
   page has `<meta name="shopify-api-key">`.
 
-### The sample-data fallback (why the live app shows sample data)
-`read_orders` returns **403 until "protected customer data" access is approved**
-(approved during App Store review). So right now, on any store, order access 403s and
-the app shows a **labelled "sample data" dashboard** (synthetic hoodie data) so the
-merchant/reviewer can preview the full UI. Once PCD is approved post-review, real
-stores get real forecasts. (Also note: default `read_orders` only returns the last
-60 days; the optional `read_all_orders` scope — NOT yet requested — would give the
-full ~18 months the engine can use for seasonality.)
+### Production sync states (why live review no longer shows samples)
+`read_orders` can return **403 until protected customer data access is approved**
+(approved during App Store review). The production app now reports that accurately:
+it syncs variants first, then shows an empty "Order history unavailable" or "No
+order history yet" state instead of synthetic recommendations. This fixes Shopify
+review requirement 2.1.4 ("Synchronize data accurately").
+
+Synthetic hoodie data still exists, but only through `DEMO=1` local/demo mode.
+Production also ignores any old cached `sample: true` payloads and recomputes, so
+reviewers do not see stale sample data after deploy.
+
+Default `read_orders` returns only recent orders; the optional `read_all_orders`
+scope — NOT yet requested — would give the full ~18 months the engine can use for
+seasonality.
 
 ---
 
@@ -148,7 +156,8 @@ full ~18 months the engine can use for seasonality.)
 
 - App fully built, deployed, and **verified working end-to-end** inside the embedded
   Shopify admin (dashboard loads via session-token auth, all features work).
-- Sample-data fallback so empty/locked stores show a polished preview (not errors).
+- Accurate empty sync states for stores where products/orders are unavailable or
+  order history is empty; demo/sample data is limited to `DEMO=1`.
 - **App Store listing 100% complete, 0 issues**: name, category (Orders & shipping ->
   Inventory -> Inventory optimization) + detail tags, English language, app intro,
   500-char description, 5 features, app-card subtitle, 5 search terms, feature media +
@@ -169,32 +178,46 @@ full ~18 months the engine can use for seasonality.)
 
 ---
 
-## 6. What is LEFT (the only blockers)
+## 6. What is LEFT (Shopify review resubmission)
 
-1. **Embedded app checks (App Bridge CDN script + session tokens) - STUCK / pending.**
-   Root cause found 2026-06-29: the installed app URL with `?shop=...` served the
-   App Bridge CDN script and `shopify.idToken()`, but the exact configured App URL
-   (`https://restocked.onrender.com/`) returned a tiny fallback page with no App
-   Bridge script. Shopify's scanner can hit the exact App URL, so it may never see
-   the CDN script. Fixed locally in `app/main.py`; also released Shopify config
-   version `restocked-4` with `shopify app deploy`.
-   - Still required: Render **Manual Deploy -> Deploy latest commit** from GitHub.
-     Verify `https://restocked.onrender.com/` contains
-     `shopify-api-key` and `shopifycloud/app-bridge.js`.
-   - After deploy: open the app on the dev store in a **clean browser (no extensions /
-     no ad blocker)**, interact for 2-3 min (load dashboard, Refresh, expand rows,
-     change lead time), then wait for the next ~2h scan.
-   - If still not green after a few hours: contact Shopify Partner Support and ask
-     them to inspect the embedded checks server-side. Mention that the root App URL
-     now returns 200 text/html with App Bridge from Shopify CDN.
-2. **Submit for review** — once embedded checks are green, click the (currently greyed)
-   **Submit for review** button at the top of the distribution checklist. User action.
-3. **Shopify review** (~5-10 business days after submit). They email updates. May
-   request changes -> fix and resubmit. **Protected customer data is approved as part
-   of this review** (which then unlocks real order forecasting).
+Shopify paused review on 2026-07-01 for:
+- **1.2.2 Billing**: reviewer hit an internal server error when choosing a plan.
+- **2.1.4 Sync accuracy**: reviewer saw data that did not accurately reflect the
+  Shopify store state.
+- **4.5.4 / 4.5.5 Testing instructions**: make sure review credentials/instructions
+  are complete.
+
+Code fixes made:
+- `/billing/subscribe` no longer calls the old Billing API. It redirects to
+  Shopify App Pricing:
+  `https://admin.shopify.com/store/:store_handle/charges/:app_handle/pricing_plans`.
+- The dashboard plan link uses `target="_top"` so the Shopify-hosted pricing page
+  opens correctly from the embedded app.
+- `/billing/callback` accepts Shopify App Pricing params (`plan_handle`,
+  `shop_domain`, `myshopify_domain`) and never 500s on approve/decline callbacks.
+- Production recommendations no longer show synthetic sample data. Product/order
+  sync failures return accurate empty states, and stale cached sample payloads are
+  ignored.
+
+Still required after pushing this fix:
+1. **Render:** Manual Deploy -> Deploy latest commit. Auto-deploy is off.
+2. **Render env:** confirm `SHOPIFY_APP_HANDLE` is set to the real App Store app
+   handle. Current expected value is `restocked-size-forecasting`.
+3. **Partner Dashboard -> Pricing:** for each Starter/Growth/Pro plan, set the
+   welcome/redirect link to `/billing/callback` (or
+   `https://restocked.onrender.com/billing/callback`) so Shopify appends
+   `plan_handle` and the shop domain after approval.
+4. **Verify live:** open the embedded app, click Manage plan, confirm Shopify's
+   hosted plan-selection page opens instead of a 500. Then return/decline/approve
+   and confirm the app loads.
+5. **Partner Dashboard -> Review/testing instructions:** include that no separate
+   app account is required; reviewers install/open through Shopify admin; use the
+   dev store `restocked-test-store.myshopify.com`; plan selection is handled by
+   Shopify App Pricing; and if order access is unavailable before protected data
+   approval, the app shows an accurate empty sync state rather than fake data.
+6. **Resubmit fixes** from the Partner Dashboard review page.
 
 Optional / later:
-- "Run a self review with AI" step on the checklist — optional, can "Mark as done".
 - Request the **`read_all_orders`** scope (API access page) for full ~18-month order
   history -> better seasonality. Not required to launch.
 
@@ -226,8 +249,8 @@ Optional / later:
 - **Render has no auto-deploy** — always Manual Deploy -> Deploy latest commit.
 - **PYTHON_VERSION pinned to 3.11.9** (newer Python tried to compile pandas from source
   and failed).
-- **Orders API 403** until protected-customer-data is approved -> that's expected and
-  why sample data shows. Don't "fix" it by removing the fallback.
+- **Orders API 403** until protected-customer-data is approved is expected. The
+  production app must show an accurate empty sync state, not fake sample data.
 - **Lead-time apply** had a URL bug (used `&lead_time=` producing a 404); fixed to
   `?lead_time=`. Watch the `api()` URL helper if you add params.
 
@@ -235,6 +258,7 @@ Optional / later:
 
 ## 9. One-line status
 
-Everything is built, pushed to GitHub, and the listing + submission are complete EXCEPT
-the app needs the 2026-06-29 root-App-URL/App-Bridge fix deployed to Render. After that, trigger the
-embedded checks again from a clean browser; once green, click **Submit for review**.
+Shopify review is paused for billing and sync-accuracy fixes. The code now uses
+Shopify App Pricing for plan selection and accurate production sync states instead
+of sample data. Next: push, deploy latest commit on Render, confirm the pricing
+welcome links/testing instructions in Partner Dashboard, then resubmit fixes.

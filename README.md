@@ -14,7 +14,7 @@ app/
   shopify_client.py   # OAuth handshake + Admin GraphQL (orders, variants)
   data_mapping.py     # Shopify response -> engine input DataFrames
   forecasting.py      # glue: pull data, run engine
-  billing.py          # Shopify recurring charge ($19/$39/$79 + 14-day trial)
+  billing.py          # Shopify App Pricing plan metadata + hosted pricing redirects
   webhooks.py         # mandatory GDPR + app/uninstalled webhooks
   store.py            # token/settings storage (Postgres or in-memory)
   templates/dashboard.html  # embedded UI with "show your math"
@@ -33,8 +33,11 @@ app/
 
 ## Deploy (prod)
 - Push to GitHub, connect to Render/Railway/Fly.io.
-- Add Postgres; set `DATABASE_URL` + the env vars from `.env`.
+- Add Postgres; set `DATABASE_URL` + the env vars from `.env`, including
+  `SHOPIFY_APP_HANDLE` for Shopify-hosted pricing redirects.
 - Set `APP_URL` to the prod URL; update the Partner dashboard URLs to match.
+- In Partner Dashboard pricing, set each plan's welcome/redirect link to
+  `/billing/callback` or `https://<your-app>/billing/callback`.
 - Nightly forecast: hit `/api/recommendations?shop=…` per active shop on a cron
   (Render Cron Job / GitHub Actions), or add APScheduler.
 

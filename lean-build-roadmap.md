@@ -67,7 +67,7 @@ A single dashboard: a sortable table of reorder recommendations (urgency, size, 
 "Here's what to reorder this week," grouped by urgency. This is the retention hook. Milestone: "app emails a useful digest on a schedule."
 
 **Step 5 — Billing + listing (week 3–4).**
-Add Shopify Billing API (recurring charge, $19/$39/$79 tiers). Write the listing: title with keywords ("size-level inventory forecasting for apparel"), screenshots, the bestseller-stockout story as your hero example. Pay the $19 one-time listing fee. Submit for review. Milestone: "live on the App Store."
+Configure Shopify App Pricing ($19/$39/$79 tiers) and redirect merchants to Shopify's hosted plan-selection page. Write the listing: title with keywords ("size-level inventory forecasting for apparel"), screenshots, the bestseller-stockout story as your hero example. Pay the $19 one-time listing fee. Submit for review. Milestone: "live on the App Store."
 
 **Step 6 — First installs & reviews (week 4+).**
 This is where the App Store validates. Get your first installs (your landing-page waitlist, apparel communities, free-for-feedback offers). First reviews break the cold-start ranking. Iterate on whatever the first 5 merchants hit.

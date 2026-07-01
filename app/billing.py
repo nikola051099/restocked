@@ -1,13 +1,13 @@
-"""
-Shopify Billing API — recurring application charge with a free trial.
+"""Plan metadata and Shopify App Pricing helpers.
 
-Flow: create a charge -> redirect merchant to confirmationUrl -> they approve
--> Shopify redirects back to /billing/callback -> we activate.
+Restocked uses Shopify App Pricing, so Shopify hosts plan selection and handles
+charge approval, decline, trials, proration, upgrades, and downgrades.
 """
 from __future__ import annotations
 
+from urllib.parse import quote
+
 from .config import settings
-from .shopify_client import AdminAPI
 
 PLANS = {
     "starter": {"name": "Starter", "price": 19.0, "variant_cap": 1000},
@@ -17,36 +17,13 @@ PLANS = {
 TRIAL_DAYS = 14
 
 
-async def create_subscription(shop: str, token: str, plan_key: str,
-                              return_url: str) -> str:
-    """Create a recurring charge; return the confirmation URL to redirect to."""
-    plan = PLANS[plan_key]
-    api = AdminAPI(shop, token)
-    mutation = """
-    mutation CreateSub($name: String!, $price: Decimal!, $trial: Int!, $url: URL!) {
-      appSubscriptionCreate(
-        name: $name
-        trialDays: $trial
-        returnUrl: $url
-        lineItems: [{
-          plan: { appRecurringPricingDetails: {
-            price: { amount: $price, currencyCode: USD }
-            interval: EVERY_30_DAYS
-          } }
-        }]
-      ) {
-        confirmationUrl
-        userErrors { field message }
-        appSubscription { id status }
-      }
-    }"""
-    data = await api._gql(mutation, {
-        "name": f"{plan['name']} plan",
-        "price": plan["price"],
-        "trial": TRIAL_DAYS,
-        "url": return_url,
-    })
-    result = data["appSubscriptionCreate"]
-    if result["userErrors"]:
-        raise RuntimeError(result["userErrors"])
-    return result["confirmationUrl"]
+def shopify_store_handle(shop: str) -> str:
+    """Return the admin store handle from a myshopify.com domain."""
+    return shop.split(".", 1)[0]
+
+
+def pricing_page_url(shop: str) -> str:
+    """Return Shopify's hosted plan-selection page for this app and shop."""
+    store_handle = quote(shopify_store_handle(shop), safe="")
+    app_handle = quote(settings.APP_HANDLE, safe="")
+    return f"https://admin.shopify.com/store/{store_handle}/charges/{app_handle}/pricing_plans"

@@ -1,7 +1,8 @@
 from fastapi.testclient import TestClient
 from app.config import settings
-from app.main import app
+from app import main
 
+app = main.app
 c = TestClient(app)
 
 def test_healthz():
@@ -21,6 +22,16 @@ def test_root_fallback_includes_app_bridge_for_scanner(monkeypatch):
     assert r.status_code == 200
     assert 'meta name="shopify-api-key"' in r.text
     assert "cdn.shopify.com/shopifycloud/app-bridge.js" in r.text
+
+def test_plan_link_breaks_out_of_embedded_iframe(monkeypatch):
+    monkeypatch.setattr(settings, "DEMO", False)
+    main.store.update("acme.myshopify.com", token="token")
+    try:
+        r = c.get("/?shop=acme.myshopify.com")
+    finally:
+        main.store.delete("acme.myshopify.com")
+    assert r.status_code == 200
+    assert 'target="_top"' in r.text
 
 def test_recommendations_demo():
     r = c.get("/api/recommendations?shop=demo-store.myshopify.com")
@@ -45,3 +56,51 @@ def test_cron_with_secret_ok():
 
 def test_bad_shop_rejected():
     assert c.get("/install?shop=evil.com").status_code == 400
+
+def test_billing_subscribe_uses_shopify_hosted_pricing(monkeypatch):
+    monkeypatch.setattr(settings, "DEMO", False)
+    monkeypatch.setattr(settings, "APP_HANDLE", "restocked-size-forecasting")
+    r = c.get("/billing/subscribe?shop=acme.myshopify.com&plan=growth",
+              follow_redirects=False)
+    assert r.status_code in (302, 307)
+    assert r.headers["location"] == (
+        "https://admin.shopify.com/store/acme/charges/"
+        "restocked-size-forecasting/pricing_plans"
+    )
+
+def test_billing_callback_accepts_shopify_app_pricing_params(monkeypatch):
+    monkeypatch.setattr(settings, "DEMO", False)
+    r = c.get("/billing/callback?shop=acme.myshopify.com&plan_handle=growth",
+              follow_redirects=False)
+    assert r.status_code in (302, 307)
+    assert r.headers["location"] == "/?shop=acme.myshopify.com"
+
+def test_billing_callback_accepts_shopify_pricing_shop_domain(monkeypatch):
+    monkeypatch.setattr(settings, "DEMO", False)
+    r = c.get("/billing/callback?shop_domain=acme.myshopify.com&plan_handle=growth",
+              follow_redirects=False)
+    assert r.status_code in (302, 307)
+    assert r.headers["location"] == "/?shop=acme.myshopify.com"
+
+def test_recommendations_recomputes_legacy_cached_sample(monkeypatch):
+    async def fake_compute(shop, token, lead_time_days=None):
+        return {
+            "recommendations": [],
+            "sample": False,
+            "sync_status": "orders_unavailable",
+            "computed_for": shop,
+        }
+
+    monkeypatch.setattr(settings, "DEMO", False)
+    monkeypatch.setattr(main, "compute_recommendations", fake_compute)
+    app.dependency_overrides[main.require_shop] = lambda: "acme.myshopify.com"
+    main.store.update("acme.myshopify.com", token="token", last_run={"sample": True})
+    try:
+        r = c.get("/api/recommendations")
+    finally:
+        app.dependency_overrides.pop(main.require_shop, None)
+        main.store.delete("acme.myshopify.com")
+
+    assert r.status_code == 200
+    assert r.json()["sample"] is False
+    assert r.json()["sync_status"] == "orders_unavailable"
