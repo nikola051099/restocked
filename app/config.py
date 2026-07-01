@@ -10,7 +10,7 @@ class Settings:
     API_SECRET: str = os.getenv("SHOPIFY_API_SECRET", "")
     SCOPES: str = os.getenv("SHOPIFY_SCOPES", "read_orders,read_products,read_inventory")
     APP_URL: str = os.getenv("APP_URL", "http://localhost:8000").rstrip("/")
-    APP_HANDLE: str = (os.getenv("SHOPIFY_APP_HANDLE") or "restocked-size-forecasting").strip()
+    APP_HANDLE: str = (os.getenv("SHOPIFY_APP_HANDLE") or "restocked-7").strip()
     APP_SECRET: str = os.getenv("APP_SECRET", "dev-insecure-secret")
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
     DEFAULT_LEAD_TIME_DAYS: int = int(os.getenv("DEFAULT_LEAD_TIME_DAYS", "30"))

@@ -201,8 +201,8 @@ Code fixes made:
 
 Still required after pushing this fix:
 1. **Render:** Manual Deploy -> Deploy latest commit. Auto-deploy is off.
-2. **Render env:** confirm `SHOPIFY_APP_HANDLE` is set to the real App Store app
-   handle. Current expected value is `restocked-size-forecasting`.
+2. **Render env:** confirm `SHOPIFY_APP_HANDLE` is set to the real Shopify app
+   handle. Current expected value is `restocked-7`.
 3. **Partner Dashboard -> Pricing:** for each Starter/Growth/Pro plan, set the
    welcome/redirect link to `/billing/callback` (or
    `https://restocked.onrender.com/billing/callback`) so Shopify appends
