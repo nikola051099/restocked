@@ -59,13 +59,13 @@ def test_bad_shop_rejected():
 
 def test_billing_subscribe_uses_shopify_hosted_pricing(monkeypatch):
     monkeypatch.setattr(settings, "DEMO", False)
-    monkeypatch.setattr(settings, "APP_HANDLE", "restocked-7")
+    monkeypatch.setattr(settings, "APP_HANDLE", "restocked-size-forecasting")
     r = c.get("/billing/subscribe?shop=acme.myshopify.com&plan=growth",
               follow_redirects=False)
     assert r.status_code in (302, 307)
     assert r.headers["location"] == (
         "https://admin.shopify.com/store/acme/charges/"
-        "restocked-7/pricing_plans"
+        "restocked-size-forecasting/pricing_plans"
     )
 
 def test_billing_callback_accepts_shopify_app_pricing_params(monkeypatch):
