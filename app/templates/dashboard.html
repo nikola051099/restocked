@@ -91,6 +91,24 @@
     .spin{display:inline-block; width:14px; height:14px; border:2px solid #c9c9c9; border-top-color:var(--ink);
       border-radius:50%; animation:s .7s linear infinite; vertical-align:-2px;}
     @keyframes s{to{transform:rotate(360deg)}}
+    /* explainer tooltips (hover, tap, and keyboard-focus) */
+    .info{position:relative; display:inline-flex; align-items:center; justify-content:center;
+      width:14px; height:14px; margin-left:5px; color:var(--hint); cursor:help; vertical-align:middle; flex:none;}
+    .info:hover, .info:focus, .info:focus-visible{color:var(--focus); outline:none;}
+    .info > svg{width:13px; height:13px; display:block;}
+    .info .tip{position:absolute; top:calc(100% + 9px); left:50%; transform:translateX(-50%);
+      width:216px; background:var(--ink); color:#fff; padding:9px 11px; border-radius:8px;
+      font:400 12px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+      text-transform:none; letter-spacing:normal; text-align:left; white-space:normal;
+      opacity:0; visibility:hidden; transition:opacity .12s ease; z-index:40; pointer-events:none;
+      box-shadow:0 6px 20px rgba(0,0,0,.22);}
+    .info .tip::before{content:""; position:absolute; bottom:100%; left:50%; transform:translateX(-50%);
+      border:5px solid transparent; border-bottom-color:var(--ink);}
+    .info:hover .tip, .info:focus .tip, .info:focus-within .tip{opacity:1; visibility:visible;}
+    .info.l .tip{left:-7px; transform:none;}
+    .info.l .tip::before{left:13px; transform:none;}
+    .info.r .tip{left:auto; right:-7px; transform:none;}
+    .info.r .tip::before{left:auto; right:13px; transform:none;}
     @media (max-width:720px){
       .cards{grid-template-columns:repeat(2,1fr);}
       .hide-sm{display:none;}
@@ -138,7 +156,7 @@
           <button data-f="ok" onclick="setFilter('ok')">Healthy</button>
         </div>
         <div class="lead">
-          <label for="lead">Lead time</label>
+          <label for="lead" data-tip="Days from placing a reorder to the stock arriving. Longer lead times mean you need to reorder earlier and in larger amounts." data-tip-align="r">Lead time</label>
           <input id="lead" type="number" min="1" max="365" step="1" onkeydown="if(event.key==='Enter')applyLead()" aria-label="Supplier lead time in days" />
           <span>days</span>
           <button onclick="applyLead()" id="leadBtn">Apply</button>
@@ -148,14 +166,14 @@
       <div style="overflow-x:auto;">
         <table>
           <thead><tr>
-            <th>Urgency</th>
+            <th data-tip="How soon this variant needs reordering. Reorder now = will sell out within your lead time; Order soon = within lead time plus your review period; Healthy = enough stock for now." data-tip-align="l">Urgency</th>
             <th>Variant</th>
             <th class="hide-sm">Product</th>
-            <th class="num sortable" data-k="current_stock" onclick="setSort('current_stock')">Stock<span class="arr" data-arr="current_stock"></span></th>
-            <th class="num sortable" data-k="days_of_cover_left" onclick="setSort('days_of_cover_left')">Days left<span class="arr" data-arr="days_of_cover_left"></span></th>
-            <th class="num sortable hide-sm" data-k="avg_weekly_demand" onclick="setSort('avg_weekly_demand')">Forecast/wk<span class="arr" data-arr="avg_weekly_demand"></span></th>
-            <th class="num sortable hide-sm" data-k="size_curve_share" onclick="setSort('size_curve_share')">Share<span class="arr" data-arr="size_curve_share"></span></th>
-            <th class="num sortable" data-k="recommended_order_qty" onclick="setSort('recommended_order_qty')">Order<span class="arr" data-arr="recommended_order_qty"></span></th>
+            <th class="num sortable" data-k="current_stock" data-tip="Units currently on hand for this variant, from your Shopify inventory." onclick="setSort('current_stock')">Stock<span class="arr" data-arr="current_stock"></span></th>
+            <th class="num sortable" data-k="days_of_cover_left" data-tip="Estimated days until this variant sells out at its recent sales rate." onclick="setSort('days_of_cover_left')">Days left<span class="arr" data-arr="days_of_cover_left"></span></th>
+            <th class="num sortable hide-sm" data-k="avg_weekly_demand" data-tip="Projected units sold per week for this variant, based on its recent sales history." onclick="setSort('avg_weekly_demand')">Forecast/wk<span class="arr" data-arr="avg_weekly_demand"></span></th>
+            <th class="num sortable hide-sm" data-k="size_curve_share" data-tip="This variant's share of its product's total demand — how much of the style's sales come from this size/color." data-tip-align="r" onclick="setSort('size_curve_share')">Share<span class="arr" data-arr="size_curve_share"></span></th>
+            <th class="num sortable" data-k="recommended_order_qty" data-tip="Suggested reorder quantity: enough to cover demand over your lead time plus a safety buffer, minus current stock." data-tip-align="r" onclick="setSort('recommended_order_qty')">Order<span class="arr" data-arr="recommended_order_qty"></span></th>
           </tr></thead>
           <tbody id="rows"><tr><td colspan="8" class="state"><span class="spin"></span> Loading…</td></tr></tbody>
         </table>
@@ -201,6 +219,24 @@
       return `<span class="swatch" style="background:${hex}" aria-hidden="true"></span>`;
     }
 
+    // Turn any [data-tip] element into a hoverable/tappable/focusable "ⓘ" explainer.
+    function hydrateTips(root){
+      (root||document).querySelectorAll('[data-tip]').forEach(el=>{
+        if(el.dataset.tipd) return; el.dataset.tipd='1';
+        const text=el.getAttribute('data-tip'); if(!text) return;
+        const align=el.getAttribute('data-tip-align')||'';
+        const info=document.createElement('span');
+        info.className='info'+(align?(' '+align):'');
+        info.tabIndex=0; info.setAttribute('aria-label',text);
+        info.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">'
+          +'<circle cx="12" cy="12" r="10"/><line x1="12" y1="11" x2="12" y2="16"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
+          +'<span class="tip" role="tooltip">'+esc(text)+'</span>';
+        info.addEventListener('click', e=>e.stopPropagation());
+        const arr=el.querySelector('.arr');
+        if(arr) el.insertBefore(info, arr); else el.appendChild(info);
+      });
+    }
+
     function setQuery(v){ STATE.q=v.trim().toLowerCase(); STATE.page=1; draw(); }
     function setFilter(f){ STATE.filter=f; STATE.page=1;
       document.querySelectorAll('#filters button').forEach(b=>b.classList.toggle('on', b.dataset.f===f)); draw(); }
@@ -215,17 +251,25 @@
       return r;
     }
 
+    const CARD_TIPS = {
+      'Reorder now':'Variants that will sell out within your supplier lead time — reorder these first.',
+      'Order soon':'Variants that will run low within your lead time plus review period.',
+      'Healthy':'Variants with enough stock to cover the upcoming window.',
+      'Total units to order':'Sum of the recommended reorder quantities across every variant.'
+    };
     function drawCards(){
       const a=STATE.all;
       const c = k => a.filter(x=>x.stockout_risk===k).length;
       const units = a.reduce((s,x)=>s+(x.recommended_order_qty||0),0);
-      document.getElementById('cards').innerHTML = [
-        ['Reorder now','crit',c('imminent'),'variants'],
-        ['Order soon','warn',c('soon'),'variants'],
-        ['Healthy','ok',c('ok'),'variants'],
-        ['Total units to order','',units,'units']
-      ].map(([k,d,v,u])=>`<div class="metric"><div class="k">${d?`<span class="dot ${d}"></span>`:''}${k}</div>
+      const cards=document.getElementById('cards');
+      cards.innerHTML = [
+        ['Reorder now','crit',c('imminent'),'variants','l'],
+        ['Order soon','warn',c('soon'),'variants',''],
+        ['Healthy','ok',c('ok'),'variants',''],
+        ['Total units to order','',units,'units','r']
+      ].map(([k,d,v,u,al])=>`<div class="metric"><div class="k" data-tip="${esc(CARD_TIPS[k]||'')}" data-tip-align="${al}">${d?`<span class="dot ${d}"></span>`:''}${k}</div>
         <div class="v">${v.toLocaleString()}<span class="u">${u}</span></div></div>`).join('');
+      hydrateTips(cards);
     }
 
     function drawArrows(){
@@ -273,11 +317,12 @@
         const wr=document.createElement('tr'); wr.className='why'; wr.style.display='none';
         wr.innerHTML=`<td colspan="8"><div class="inner">${esc(x.reasoning)}
           <div class="grid">
-            <div class="kv"><div class="kk">Forecast / week</div><div class="vv">${fmt1(x.avg_weekly_demand)}</div></div>
-            <div class="kv"><div class="kk">Safety stock</div><div class="vv">${rnd(x.safety_stock)}</div></div>
-            <div class="kv"><div class="kk">Reorder point</div><div class="vv">${rnd(x.reorder_point)}</div></div>
-            <div class="kv"><div class="kk">Method</div><div class="vv" style="font-size:12px;">${esc(x.method)||'—'}</div></div>
+            <div class="kv"><div class="kk" data-tip="Projected weekly demand used for this recommendation." data-tip-align="l">Forecast / week</div><div class="vv">${fmt1(x.avg_weekly_demand)}</div></div>
+            <div class="kv"><div class="kk" data-tip="Extra buffer stock to absorb demand swings during the lead time, sized to your service level." data-tip-align="l">Safety stock</div><div class="vv">${rnd(x.safety_stock)}</div></div>
+            <div class="kv"><div class="kk" data-tip="Reorder when stock reaches this level — expected demand over the lead time plus safety stock." data-tip-align="r">Reorder point</div><div class="vv">${rnd(x.reorder_point)}</div></div>
+            <div class="kv"><div class="kk" data-tip="The forecasting model used for this variant, chosen from how much sales history it has." data-tip-align="r">Method</div><div class="vv" style="font-size:12px;">${esc(x.method)||'—'}</div></div>
           </div></div></td>`;
+        hydrateTips(wr);
         const toggle=()=>{const open=wr.style.display!=='none'; wr.style.display=open?'none':'table-row'; tr.setAttribute('aria-expanded',String(!open));};
         tr.onclick=toggle;
         tr.onkeydown=(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); toggle(); } };
@@ -340,6 +385,7 @@
       a.download='reorder-recommendations.csv'; a.click(); URL.revokeObjectURL(a.href);
     }
 
+    hydrateTips();
     load();
   </script>
 </body>
