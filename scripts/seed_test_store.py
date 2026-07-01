@@ -34,6 +34,14 @@ import time
 
 import httpx
 
+# Use the OS trust store when available (handles Windows/corporate root CAs
+# that aren't in certifi's bundle, which otherwise breaks TLS to Shopify).
+try:
+    import truststore
+    truststore.inject_into_ssl()
+except Exception:
+    pass
+
 API_VERSION = os.getenv("SEED_API_VERSION", "2026-04")
 SHOP = os.getenv("SEED_SHOP", "").strip()
 TOKEN = os.getenv("SEED_TOKEN", "").strip()
@@ -142,18 +150,61 @@ mutation Del($input: ProductDeleteInput!) {
   productDelete(input: $input) { deletedProductId userErrors { field message } }
 }"""
 
+FETCH_SEEDED = """
+query Seeded($cursor: String) {
+  products(first: 20, after: $cursor, query: "tag:restocked-seed") {
+    edges { cursor node {
+      id title
+      variants(first: 50) { edges { node { id selectedOptions { name value } } } }
+    } }
+    pageInfo { hasNextPage }
+  }
+}"""
 
-def build_variants(price: str) -> list[dict]:
+
+def fetch_seeded(client: httpx.Client) -> list[dict]:
+    """Return already-seeded products+variants so re-runs don't duplicate them."""
+    by_title = {p["title"]: p for p in PRODUCTS}
+    created, cursor = [], None
+    while True:
+        data = gql(client, FETCH_SEEDED, {"cursor": cursor})
+        conn = data["products"]
+        for e in conn["edges"]:
+            node = e["node"]; cursor = e["cursor"]
+            p = by_title.get(node["title"])
+            if not p:
+                continue
+            variants = []
+            for ve in node["variants"]["edges"]:
+                vn = ve["node"]
+                opts = {o["name"]: o["value"] for o in vn["selectedOptions"]}
+                variants.append({"variant_id": vn["id"],
+                                 "size": opts.get("Size", ""),
+                                 "color": opts.get("Color", "")})
+            created.append({"product": p, "variants": variants})
+        if not conn["pageInfo"]["hasNextPage"]:
+            break
+    return created
+
+
+def build_variants(product: dict, location_id: str) -> list[dict]:
     variants = []
     for color in COLORS:
         for size in SIZES:
+            base = weekly_demand(product, size, color)
+            stock = LOW_STOCK.get((product["title"], size, color),
+                                  int(round(base * 2)))
             variants.append({
                 "optionValues": [
                     {"optionName": "Size", "name": size},
                     {"optionName": "Color", "name": color},
                 ],
-                "price": price,
+                "price": product["price"],
                 "inventoryItem": {"tracked": True},
+                "inventoryQuantities": [
+                    {"locationId": location_id, "name": "available",
+                     "quantity": int(stock)},
+                ],
             })
     return variants
 
@@ -173,7 +224,7 @@ def create_products(client: httpx.Client, location_id: str) -> list[dict]:
                 {"name": "Color", "position": 2,
                  "values": [{"name": c} for c in COLORS]},
             ],
-            "variants": build_variants(p["price"]),
+            "variants": build_variants(p, location_id),
         }
         data = gql(client, PRODUCT_SET, {"input": var_input})
         _user_errors(data, "productSet")
@@ -184,27 +235,11 @@ def create_products(client: httpx.Client, location_id: str) -> list[dict]:
             opts = {o["name"]: o["value"] for o in node["selectedOptions"]}
             variants.append({
                 "variant_id": node["id"],
-                "inventory_item_id": node["inventoryItem"]["id"],
                 "size": opts.get("Size", ""),
                 "color": opts.get("Color", ""),
             })
         print(f"  created '{p['title']}' with {len(variants)} variants")
         created.append({"product": p, "variants": variants})
-
-        # set inventory per variant (weekly demand * ~2 weeks cover, minus low-stock)
-        quantities = []
-        for v in variants:
-            base = weekly_demand(p, v["size"], v["color"])
-            stock = LOW_STOCK.get((p["title"], v["size"], v["color"]),
-                                  int(round(base * 2)))
-            quantities.append({"inventoryItemId": v["inventory_item_id"],
-                               "locationId": location_id,
-                               "quantity": int(stock)})
-            v["stock"] = int(stock)
-        inv_input = {"name": "available", "reason": "correction",
-                     "ignoreCompareQuantity": True, "quantities": quantities}
-        data = gql(client, INV_SET, {"input": inv_input})
-        _user_errors(data, "inventorySetQuantities")
     return created
 
 
@@ -212,28 +247,49 @@ def weekly_demand(product: dict, size: str, color: str) -> float:
     return 12.0 * product["demand"] * SIZE_CURVE[size] * COLORS[color]
 
 
-def create_orders(client: httpx.Client, created: list[dict], n_orders: int = 40) -> None:
-    # build a weighted pool of variants by their demand so popular sizes sell more
+def _make_order(client: httpx.Client, line_items: list[dict]) -> bool:
+    """Create one order, retrying Shopify's transient 'Too many attempts' throttle."""
+    order = {"lineItems": line_items, "financialStatus": "PAID"}
+    options = {"inventoryBehaviour": "BYPASS", "sendReceipt": False,
+               "sendFulfillmentReceipt": False}
+    for attempt in range(6):
+        data = gql(client, ORDER_CREATE, {"order": order, "options": options})
+        errs = (data.get("orderCreate") or {}).get("userErrors") or []
+        if not errs:
+            return True
+        msg = " ".join(e.get("message", "") for e in errs).lower()
+        if "too many" in msg or "try again" in msg:
+            time.sleep(min(8 * (attempt + 1), 45))
+            continue
+        raise SystemExit(f"orderCreate userErrors: {errs}")
+    return False
+
+
+def create_orders(client: httpx.Client, created: list[dict],
+                  n_orders: int = 22) -> None:
+    n_orders = int(os.getenv("SEED_ORDERS", n_orders))
+    # weighted pool of variants by demand so popular sizes/colors sell more
     pool = []
     for c in created:
         for v in c["variants"]:
             w = weekly_demand(c["product"], v["size"], v["color"])
             pool.extend([v["variant_id"]] * max(1, int(round(w * 3))))
 
+    time.sleep(4)  # let any post-creation throttle clear before ordering
     made = 0
-    for _ in range(n_orders):
-        k = random.randint(2, 5)
+    for i in range(n_orders):
+        k = random.randint(4, 8)
         picks = random.sample(pool, min(k, len(pool)))
         counts: dict[str, int] = {}
         for vid in picks:
             counts[vid] = counts.get(vid, 0) + random.randint(1, 3)
         line_items = [{"variantId": vid, "quantity": q} for vid, q in counts.items()]
-        order = {"lineItems": line_items, "financialStatus": "PAID"}
-        options = {"inventoryBehaviour": "BYPASS", "sendReceipt": False,
-                   "sendFulfillmentReceipt": False}
-        data = gql(client, ORDER_CREATE, {"order": order, "options": options})
-        _user_errors(data, "orderCreate")
-        made += 1
+        if _make_order(client, line_items):
+            made += 1
+            time.sleep(1.2)
+        else:
+            print(f"  order {i + 1} still rate-limited after retries; stopping early")
+            break
     print(f"  created {made} orders across seeded variants")
 
 
@@ -267,8 +323,13 @@ def main() -> None:
             cleanup(client)
             print("Done.")
             return
-        loc = primary_location_id(client)
-        created = create_products(client, loc)
+        created = fetch_seeded(client)
+        if created:
+            n = sum(len(c["variants"]) for c in created)
+            print(f"  reusing {len(created)} existing seeded products / {n} variants")
+        else:
+            loc = primary_location_id(client)
+            created = create_products(client, loc)
         create_orders(client, created)
         n_variants = sum(len(c["variants"]) for c in created)
         print(f"\nDone. Seeded {len(created)} products / {n_variants} variants + orders.")
