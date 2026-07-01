@@ -212,10 +212,10 @@ Code fixes made:
 Current status after 2026-07-01 checks:
 1. **Render/live app:** deployed and returning the correct App Bridge root page.
    `/billing/subscribe?shop=restocked-test-store.myshopify.com&plan=growth`
-   redirects to Shopify's hosted pricing URL with handle
-   `restocked-size-forecasting`.
-2. **Render env:** `SHOPIFY_APP_HANDLE=restocked-size-forecasting` confirmed as
-   required; live redirect currently uses that handle.
+   must redirect to Shopify's hosted pricing URL with handle `restocked-7`.
+   Shopify Admin's app details page confirmed this handle opens the plan selector.
+2. **Render env:** `SHOPIFY_APP_HANDLE=restocked-7` is required. The previous
+   `restocked-size-forecasting` value redirects back to the installed apps page.
 3. **Partner Dashboard -> Pricing:** switched from Manual pricing to Shopify App
    Pricing and saved. Default billing frequency set to Monthly. Pricing index
    shows 3 public plans: starter/growth/pro with monthly prices and 14-day trials.
