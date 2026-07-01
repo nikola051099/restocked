@@ -172,6 +172,10 @@ seasonality.
   2026-07-01. It was previously still set to Manual pricing, which likely caused
   the billing review failure. Default billing frequency is now Monthly. Pricing
   index shows public starter/growth/pro plans with monthly prices and 14-day trials.
+- **Plan redirect URLs fixed** on 2026-07-01: public starter/growth/pro and the
+  private `shopify-test` plan now redirect to `/billing/callback` after plan
+  selection. The private `$0/month` `shopify-test` plan has
+  `restocked-test-store.myshopify.com` in its store access list.
 - **Protected customer data request** filled and saved (data use = "Store management",
   NO optional PII fields requested, all **9/9** data-protection questions answered).
   Status = Draft; it's reviewed automatically when the app is submitted.
@@ -215,17 +219,23 @@ Current status after 2026-07-01 checks:
 3. **Partner Dashboard -> Pricing:** switched from Manual pricing to Shopify App
    Pricing and saved. Default billing frequency set to Monthly. Pricing index
    shows 3 public plans: starter/growth/pro with monthly prices and 14-day trials.
-4. **Partner Dashboard -> Testing instructions:** updated and saved. They now say
+   All public plan redirect URLs are `/billing/callback`.
+4. **Partner Dashboard -> Private test plan:** `shopify-test` is a `$0/month`
+   private test plan, redirects to `/billing/callback`, and authorizes
+   `restocked-test-store.myshopify.com`.
+5. **Partner Dashboard -> Testing instructions:** updated and saved. They now say
    no separate Restocked account is required, first-open plan selection uses
    Shopify App Pricing, and unavailable order history displays an accurate empty
    sync state instead of fake recommendations.
 
 Still required before resubmitting:
 1. **Fresh install pricing test:** the existing dev-store install still returns to
-   the installed apps page when opening the hosted pricing URL. Because this app
-   was installed before Shopify App Pricing was enabled, test from a fresh install
-   (uninstall/reinstall on `restocked-test-store.myshopify.com` or use a fresh dev
-   store) and confirm the plan selector appears.
+   the installed apps page when opening the hosted pricing URL, even after Shopify
+   App Pricing, plan redirect URLs, and private test-plan store access were fixed.
+   Because this app was installed before Shopify App Pricing was enabled, test
+   from a fresh install (uninstall/reinstall on
+   `restocked-test-store.myshopify.com` or use a fresh dev store) and confirm the
+   plan selector appears.
 2. **Resubmit fixes** from the Partner Dashboard review page after the fresh-install
    pricing test is satisfactory.
 
