@@ -63,6 +63,28 @@ async def exchange_code_for_token(shop: str, code: str) -> str:
         return r.json()["access_token"]
 
 
+def required_access_scopes() -> set[str]:
+    return {s.strip() for s in settings.SCOPES.split(",") if s.strip()}
+
+
+async def fetch_access_scopes(shop: str, token: str) -> set[str]:
+    url = f"https://{shop}/admin/oauth/access_scopes.json"
+    headers = {"X-Shopify-Access-Token": token}
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.get(url, headers=headers)
+        r.raise_for_status()
+        body = r.json()
+    return {
+        item.get("handle")
+        for item in body.get("access_scopes", [])
+        if item.get("handle")
+    }
+
+
+async def missing_access_scopes(shop: str, token: str) -> set[str]:
+    return required_access_scopes() - await fetch_access_scopes(shop, token)
+
+
 # --------------------------- Admin GraphQL -------------------------------- #
 
 class AdminAPI:

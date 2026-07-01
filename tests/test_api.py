@@ -24,7 +24,11 @@ def test_root_fallback_includes_app_bridge_for_scanner(monkeypatch):
     assert "cdn.shopify.com/shopifycloud/app-bridge.js" in r.text
 
 def test_plan_link_breaks_out_of_embedded_iframe(monkeypatch):
+    async def fake_missing_scopes(shop, token):
+        return set()
+
     monkeypatch.setattr(settings, "DEMO", False)
+    monkeypatch.setattr(main.sc, "missing_access_scopes", fake_missing_scopes)
     main.store.update("acme.myshopify.com", token="token")
     try:
         r = c.get("/?shop=acme.myshopify.com")
@@ -32,6 +36,21 @@ def test_plan_link_breaks_out_of_embedded_iframe(monkeypatch):
         main.store.delete("acme.myshopify.com")
     assert r.status_code == 200
     assert 'target="_top"' in r.text
+
+def test_dashboard_redirects_stale_install_for_scope_update(monkeypatch):
+    async def fake_missing_scopes(shop, token):
+        return {"read_products"}
+
+    monkeypatch.setattr(settings, "DEMO", False)
+    monkeypatch.setattr(main.sc, "missing_access_scopes", fake_missing_scopes)
+    main.store.update("acme.myshopify.com", token="token")
+    try:
+        r = c.get("/?shop=acme.myshopify.com", follow_redirects=False)
+    finally:
+        main.store.delete("acme.myshopify.com")
+
+    assert r.status_code in (302, 307)
+    assert r.headers["location"] == "/install?shop=acme.myshopify.com"
 
 def test_recommendations_demo():
     r = c.get("/api/recommendations?shop=demo-store.myshopify.com")

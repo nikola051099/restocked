@@ -114,11 +114,20 @@ async def dashboard(request: Request, shop: str | None = None):
         shop = "demo-store.myshopify.com"
     if not _valid_shop(shop):
         return HTMLResponse(_open_from_admin_html())
-    if not settings.DEMO and not store.get(shop).get("token"):
-        return RedirectResponse(f"/install?shop={shop}")
+    data = store.get(shop)
+    if not settings.DEMO:
+        token = data.get("token")
+        if not token:
+            return RedirectResponse(f"/install?shop={shop}")
+        try:
+            missing_scopes = await sc.missing_access_scopes(shop, token)
+        except Exception:
+            missing_scopes = set(settings.SCOPES.split(","))
+        if missing_scopes:
+            return RedirectResponse(f"/install?shop={shop}")
     return templates.TemplateResponse(request, "dashboard.html", {
         "shop": shop, "api_key": settings.API_KEY,
-        "plans": PLANS, "plan": store.get(shop).get("plan"), "demo": settings.DEMO})
+        "plans": PLANS, "plan": data.get("plan"), "demo": settings.DEMO})
 
 
 # --------------------------- Data API ------------------------------------- #
