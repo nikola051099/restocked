@@ -5,6 +5,7 @@ DEMO data generator so the app can run with no Shopify connection.
 from __future__ import annotations
 
 import json
+import logging
 from datetime import date, datetime, timedelta, timezone
 
 import numpy as np
@@ -14,6 +15,8 @@ from forecasting_engine import ForecastEngine, ForecastConfig
 from .config import settings
 from .shopify_client import AdminAPI
 from . import data_mapping
+
+logger = logging.getLogger(__name__)
 
 
 def _run(orders_df, variants_df, lead_time_days: int | None) -> dict:
@@ -67,12 +70,27 @@ async def compute_recommendations(shop: str, token: str,
     try:
         variant_nodes = await api.fetch_variants()
     except Exception:
+        logger.exception("Shopify variant sync failed for %s", shop)
+        try:
+            variant_nodes = await api.fetch_variants(include_inventory=False)
+        except Exception:
+            logger.exception("Shopify product-only variant sync failed for %s", shop)
+            return _empty_payload(
+                shop,
+                lead_time_days,
+                "Product sync unavailable",
+                "Restocked could not read this store's Shopify products and variants yet. Confirm the app is installed with product and inventory permissions, then refresh the forecast.",
+                sync_status="variants_unavailable",
+            )
+
+        variants_df = data_mapping.variants_to_df(variant_nodes)
         return _empty_payload(
             shop,
             lead_time_days,
-            "Product sync unavailable",
-            "Restocked could not read this store's Shopify products and variants yet. Confirm the app is installed with product and inventory permissions, then refresh the forecast.",
-            sync_status="variants_unavailable",
+            "Inventory sync unavailable",
+            "Restocked synced this store's products and variants, but Shopify inventory quantities are not available to the app yet. Confirm the app has inventory permission, then refresh the forecast.",
+            variants_df=variants_df,
+            sync_status="inventory_unavailable",
         )
 
     variants_df = data_mapping.variants_to_df(variant_nodes)

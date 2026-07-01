@@ -152,22 +152,27 @@ class AdminAPI:
                 break
         return nodes
 
-    async def fetch_variants(self, page_limit: int = 50) -> list[dict]:
-        query = """
-        query Variants($cursor: String) {
-          productVariants(first: 200, after: $cursor) {
-            edges {
+    async def fetch_variants(
+        self,
+        page_limit: int = 50,
+        include_inventory: bool = True,
+    ) -> list[dict]:
+        inventory_field = "inventoryQuantity" if include_inventory else ""
+        query = f"""
+        query Variants($cursor: String) {{
+          productVariants(first: 200, after: $cursor) {{
+            edges {{
               cursor
-              node {
+              node {{
                 id
-                inventoryQuantity
-                selectedOptions { name value }
-                product { id title }
-              }
-            }
-            pageInfo { hasNextPage }
-          }
-        }"""
+                {inventory_field}
+                selectedOptions {{ name value }}
+                product {{ id title }}
+              }}
+            }}
+            pageInfo {{ hasNextPage }}
+          }}
+        }}"""
         nodes, cursor = [], None
         for _ in range(page_limit):
             data = await self._gql(query, {"cursor": cursor})
