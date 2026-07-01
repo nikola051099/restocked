@@ -212,10 +212,11 @@ Code fixes made:
 Current status after 2026-07-01 checks:
 1. **Render/live app:** deployed and returning the correct App Bridge root page.
    `/billing/subscribe?shop=restocked-test-store.myshopify.com&plan=growth`
-   must redirect to Shopify's hosted pricing URL with handle `restocked-7`.
+   now redirects to Shopify's hosted pricing URL with handle `restocked-7`.
    Shopify Admin's app details page confirmed this handle opens the plan selector.
-2. **Render env:** `SHOPIFY_APP_HANDLE=restocked-7` is required. The previous
-   `restocked-size-forecasting` value redirects back to the installed apps page.
+2. **Render env:** `SHOPIFY_APP_HANDLE=restocked-7` is set and deployed. The
+   previous `restocked-size-forecasting` value redirects back to the installed
+   apps page.
 3. **Partner Dashboard -> Pricing:** switched from Manual pricing to Shopify App
    Pricing and saved. Default billing frequency set to Monthly. Pricing index
    shows 3 public plans: starter/growth/pro with monthly prices and 14-day trials.
@@ -227,17 +228,14 @@ Current status after 2026-07-01 checks:
    no separate Restocked account is required, first-open plan selection uses
    Shopify App Pricing, and unavailable order history displays an accurate empty
    sync state instead of fake recommendations.
+6. **Development-store plan test:** verified in
+   `restocked-test-store.myshopify.com`. Shopify Admin -> app details -> Billing
+   -> Select plan opens the hosted selector with Test plan, Starter, Growth, and
+   Pro. Selecting and approving the free Test plan returns to the embedded app
+   without a 500.
 
 Still required before resubmitting:
-1. **Fresh install pricing test:** the existing dev-store install still returns to
-   the installed apps page when opening the hosted pricing URL, even after Shopify
-   App Pricing, plan redirect URLs, and private test-plan store access were fixed.
-   Because this app was installed before Shopify App Pricing was enabled, test
-   from a fresh install (uninstall/reinstall on
-   `restocked-test-store.myshopify.com` or use a fresh dev store) and confirm the
-   plan selector appears.
-2. **Resubmit fixes** from the Partner Dashboard review page after the fresh-install
-   pricing test is satisfactory.
+1. **Resubmit fixes** from the Partner Dashboard review page.
 
 Optional / later:
 - Request the **`read_all_orders`** scope (API access page) for full ~18-month order
@@ -281,6 +279,6 @@ Optional / later:
 ## 9. One-line status
 
 Shopify review is paused for billing and sync-accuracy fixes. Code fixes are live,
-Shopify App Pricing is enabled in Partner Dashboard, and testing instructions are
-updated. Remaining check: verify the hosted pricing selector from a fresh install,
-then click **Submit fixes** in Partner Dashboard.
+Shopify App Pricing is enabled, the live app opens/approves the hosted free test
+plan, sync failures show accurate empty states, and testing instructions are
+updated. Next: click **Submit fixes** in Partner Dashboard.
