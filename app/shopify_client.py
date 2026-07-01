@@ -11,6 +11,7 @@ import asyncio
 import hashlib
 import hmac
 import secrets
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
 import httpx
@@ -53,14 +54,65 @@ def verify_webhook(raw_body: bytes, hmac_header: str) -> bool:
     return hmac.compare_digest(expected, hmac_header or "")
 
 
-async def exchange_code_for_token(shop: str, code: str) -> str:
+def _token_expiry(seconds: int | None, skew_seconds: int = 0) -> str | None:
+    if not seconds:
+        return None
+    return (
+        datetime.now(timezone.utc) + timedelta(seconds=max(seconds - skew_seconds, 0))
+    ).isoformat()
+
+
+def token_data(body: dict) -> dict:
+    data = {"token": body["access_token"]}
+    if body.get("refresh_token"):
+        data["refresh_token"] = body["refresh_token"]
+    if body.get("expires_in"):
+        data["token_expires_at"] = _token_expiry(int(body["expires_in"]), 120)
+    if body.get("refresh_token_expires_in"):
+        data["refresh_token_expires_at"] = _token_expiry(
+            int(body["refresh_token_expires_in"])
+        )
+    if body.get("scope"):
+        data["token_scope"] = body["scope"]
+    return data
+
+
+def token_needs_refresh(data: dict, skew_seconds: int = 300) -> bool:
+    expires_at = data.get("token_expires_at")
+    if not expires_at or not data.get("refresh_token"):
+        return False
+    try:
+        expiry = datetime.fromisoformat(expires_at)
+    except ValueError:
+        return True
+    if expiry.tzinfo is None:
+        expiry = expiry.replace(tzinfo=timezone.utc)
+    return expiry <= datetime.now(timezone.utc) + timedelta(seconds=skew_seconds)
+
+
+async def exchange_code_for_token(shop: str, code: str) -> dict:
     url = f"https://{shop}/admin/oauth/access_token"
     payload = {"client_id": settings.API_KEY,
-               "client_secret": settings.API_SECRET, "code": code}
+               "client_secret": settings.API_SECRET, "code": code,
+               "expiring": "1"}
     async with httpx.AsyncClient(timeout=30) as client:
-        r = await client.post(url, json=payload)
+        r = await client.post(url, data=payload, headers={"Accept": "application/json"})
         r.raise_for_status()
-        return r.json()["access_token"]
+        return token_data(r.json())
+
+
+async def refresh_expiring_offline_token(shop: str, refresh_token: str) -> dict:
+    url = f"https://{shop}/admin/oauth/access_token"
+    payload = {
+        "client_id": settings.API_KEY,
+        "client_secret": settings.API_SECRET,
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+    }
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.post(url, data=payload, headers={"Accept": "application/json"})
+        r.raise_for_status()
+        return token_data(r.json())
 
 
 def required_access_scopes() -> set[str]:

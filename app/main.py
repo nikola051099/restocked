@@ -40,6 +40,21 @@ def _legacy_sample_payload(data: dict) -> bool:
     return isinstance(last_run, dict) and last_run.get("sample") is True
 
 
+async def _current_token(shop: str, data: dict) -> str | None:
+    token = data.get("token")
+    if not token:
+        return None
+    if sc.token_needs_refresh(data):
+        try:
+            refreshed = await sc.refresh_expiring_offline_token(shop, data["refresh_token"])
+            data.update(refreshed)
+            store.put(shop, data)
+            token = data.get("token")
+        except Exception:
+            return token
+    return token
+
+
 def _open_from_admin_html() -> str:
     bridge = "" if settings.DEMO else (
         f'  <meta name="shopify-api-key" content="{settings.API_KEY}" />\n'
@@ -100,10 +115,11 @@ async def auth_callback(request: Request):
         raise HTTPException(401, "HMAC verification failed")
     if params.get("state") != store.get(shop).get("oauth_state"):
         raise HTTPException(401, "State mismatch")
-    token = await sc.exchange_code_for_token(shop, params["code"])
+    token_fields = await sc.exchange_code_for_token(shop, params["code"])
     data = store.get(shop)
     scope_checked = data.get("scope_check_state") == params.get("state")
-    data.update(token=token, oauth_state=None, scope_check_state=None)
+    data.update(token_fields)
+    data.update(oauth_state=None, scope_check_state=None)
     store.put(shop, data)
     host = params.get("host", "")
     suffix = "&scope_checked=1" if scope_checked else ""
@@ -125,7 +141,7 @@ async def dashboard(request: Request, shop: str | None = None):
         return HTMLResponse(_open_from_admin_html())
     data = store.get(shop)
     if not settings.DEMO:
-        token = data.get("token")
+        token = await _current_token(shop, data)
         if not token:
             return RedirectResponse(f"/install?shop={shop}")
         scope_checked = request.query_params.get("scope_checked") == "1"
@@ -148,11 +164,12 @@ async def api_recommendations(shop: str = Depends(require_shop)):
         data = store.get(shop)
         return JSONResponse(data.get("last_run") or build_demo_payload(data.get("lead_time_days")))
     data = store.get(shop)
-    if not data.get("token"):
+    token = await _current_token(shop, data)
+    if not token:
         raise HTTPException(401, "Not installed")
     if data.get("last_run") and not _legacy_sample_payload(data):
         return JSONResponse(data["last_run"])
-    result = await compute_recommendations(shop, data["token"], data.get("lead_time_days"))
+    result = await compute_recommendations(shop, token, data.get("lead_time_days"))
     data["last_run"] = result; data["email"] = result.get("shop_email") or data.get("email")
     store.put(shop, data)
     return JSONResponse(result)
@@ -168,9 +185,10 @@ async def api_refresh(shop: str = Depends(require_shop), lead_time: int | None =
         result = build_demo_payload(data.get("lead_time_days"))
         data["last_run"] = result; store.put(shop, data)
         return JSONResponse(result)
-    if not data.get("token"):
+    token = await _current_token(shop, data)
+    if not token:
         raise HTTPException(401, "Not installed")
-    result = await compute_recommendations(shop, data["token"], data.get("lead_time_days"))
+    result = await compute_recommendations(shop, token, data.get("lead_time_days"))
     data["last_run"] = result; data["email"] = result.get("shop_email") or data.get("email")
     store.put(shop, data)
     return JSONResponse(result)
@@ -189,10 +207,11 @@ async def refresh_all(x_cron_secret: str | None = Header(default=None)):
     done, failed = 0, 0
     for shop in store.all_shops():
         data = store.get(shop)
-        if not data.get("token"):
+        token = await _current_token(shop, data)
+        if not token:
             continue
         try:
-            result = await compute_recommendations(shop, data["token"], data.get("lead_time_days"))
+            result = await compute_recommendations(shop, token, data.get("lead_time_days"))
             data["last_run"] = result; data["email"] = result.get("shop_email") or data.get("email")
             store.put(shop, data); done += 1
         except Exception:
