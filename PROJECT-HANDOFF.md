@@ -163,9 +163,15 @@ seasonality.
   500-char description, 5 features, app-card subtitle, 5 search terms, feature media +
   3 desktop screenshots (with alt text), support + contact emails (nikola050304@gmail.com),
   privacy URL, sales-channel = "doesn't require", test account = "no account required",
-  testing instructions, **screencast URL** (the YouTube link).
+  testing instructions, **screencast URL** (the YouTube link). Testing instructions
+  were updated 2026-07-01 to remove stale "demo dataset" language and explain
+  Shopify App Pricing plus accurate empty sync states.
 - **3 pricing plans** created with display names + feature bullets (Starter/Growth/Pro,
   14-day trial each).
+- **Shopify App Pricing enabled** in Partner Dashboard pricing settings on
+  2026-07-01. It was previously still set to Manual pricing, which likely caused
+  the billing review failure. Default billing frequency is now Monthly. Pricing
+  index shows public starter/growth/pro plans with monthly prices and 14-day trials.
 - **Protected customer data request** filled and saved (data use = "Store management",
   NO optional PII fields requested, all **9/9** data-protection questions answered).
   Status = Draft; it's reviewed automatically when the app is submitted.
@@ -199,23 +205,29 @@ Code fixes made:
   sync failures return accurate empty states, and stale cached sample payloads are
   ignored.
 
-Still required after pushing this fix:
-1. **Render:** Manual Deploy -> Deploy latest commit. Auto-deploy is off.
-2. **Render env:** confirm `SHOPIFY_APP_HANDLE` is set to the real App Store app
-   handle. Current expected value is `restocked-size-forecasting`.
-3. **Partner Dashboard -> Pricing:** for each Starter/Growth/Pro plan, set the
-   welcome/redirect link to `/billing/callback` (or
-   `https://restocked.onrender.com/billing/callback`) so Shopify appends
-   `plan_handle` and the shop domain after approval.
-4. **Verify live:** open the embedded app, click Manage plan, confirm Shopify's
-   hosted plan-selection page opens instead of a 500. Then return/decline/approve
-   and confirm the app loads.
-5. **Partner Dashboard -> Review/testing instructions:** include that no separate
-   app account is required; reviewers install/open through Shopify admin; use the
-   dev store `restocked-test-store.myshopify.com`; plan selection is handled by
-   Shopify App Pricing; and if order access is unavailable before protected data
-   approval, the app shows an accurate empty sync state rather than fake data.
-6. **Resubmit fixes** from the Partner Dashboard review page.
+Current status after 2026-07-01 checks:
+1. **Render/live app:** deployed and returning the correct App Bridge root page.
+   `/billing/subscribe?shop=restocked-test-store.myshopify.com&plan=growth`
+   redirects to Shopify's hosted pricing URL with handle
+   `restocked-size-forecasting`.
+2. **Render env:** `SHOPIFY_APP_HANDLE=restocked-size-forecasting` confirmed as
+   required; live redirect currently uses that handle.
+3. **Partner Dashboard -> Pricing:** switched from Manual pricing to Shopify App
+   Pricing and saved. Default billing frequency set to Monthly. Pricing index
+   shows 3 public plans: starter/growth/pro with monthly prices and 14-day trials.
+4. **Partner Dashboard -> Testing instructions:** updated and saved. They now say
+   no separate Restocked account is required, first-open plan selection uses
+   Shopify App Pricing, and unavailable order history displays an accurate empty
+   sync state instead of fake recommendations.
+
+Still required before resubmitting:
+1. **Fresh install pricing test:** the existing dev-store install still returns to
+   the installed apps page when opening the hosted pricing URL. Because this app
+   was installed before Shopify App Pricing was enabled, test from a fresh install
+   (uninstall/reinstall on `restocked-test-store.myshopify.com` or use a fresh dev
+   store) and confirm the plan selector appears.
+2. **Resubmit fixes** from the Partner Dashboard review page after the fresh-install
+   pricing test is satisfactory.
 
 Optional / later:
 - Request the **`read_all_orders`** scope (API access page) for full ~18-month order
@@ -258,7 +270,7 @@ Optional / later:
 
 ## 9. One-line status
 
-Shopify review is paused for billing and sync-accuracy fixes. The code now uses
-Shopify App Pricing for plan selection and accurate production sync states instead
-of sample data. Next: push, deploy latest commit on Render, confirm the pricing
-welcome links/testing instructions in Partner Dashboard, then resubmit fixes.
+Shopify review is paused for billing and sync-accuracy fixes. Code fixes are live,
+Shopify App Pricing is enabled in Partner Dashboard, and testing instructions are
+updated. Remaining check: verify the hosted pricing selector from a fresh install,
+then click **Submit fixes** in Partner Dashboard.
