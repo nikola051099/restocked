@@ -234,8 +234,10 @@ Current status after 2026-07-01 checks:
    Pro. Selecting and approving the free Test plan returns to the embedded app
    without a 500.
 
-Still required before resubmitting:
-1. **Resubmit fixes** from the Partner Dashboard review page.
+Submitted after fixes:
+- **Submit fixes clicked on 2026-07-01.** Partner Dashboard status changed to
+  Submitted and shows "We're assigning a reviewer to your submission." Next
+  action is to monitor the review email inbox for Shopify's response.
 
 Optional / later:
 - Request the **`read_all_orders`** scope (API access page) for full ~18-month order
@@ -278,7 +280,7 @@ Optional / later:
 
 ## 9. One-line status
 
-Shopify review is paused for billing and sync-accuracy fixes. Code fixes are live,
-Shopify App Pricing is enabled, the live app opens/approves the hosted free test
-plan, sync failures show accurate empty states, and testing instructions are
-updated. Next: click **Submit fixes** in Partner Dashboard.
+Shopify fixes were submitted on 2026-07-01. Code fixes are live, Shopify App
+Pricing is enabled, the live app opens/approves the hosted free test plan, sync
+failures show accurate empty states, and testing instructions are updated. Next:
+wait for Shopify's reviewer response.
