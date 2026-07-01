@@ -67,6 +67,21 @@ def test_dashboard_does_not_loop_after_scope_update_attempt(monkeypatch):
     assert r.status_code == 200
     assert "Restocked" in r.text
 
+def test_dashboard_redirects_when_scope_check_fails(monkeypatch):
+    async def fake_missing_scopes(shop, token):
+        raise RuntimeError("Shopify returned 403")
+
+    monkeypatch.setattr(settings, "DEMO", False)
+    monkeypatch.setattr(main.sc, "missing_access_scopes", fake_missing_scopes)
+    main.store.update("acme.myshopify.com", token="stale-token")
+    try:
+        r = c.get("/?shop=acme.myshopify.com", follow_redirects=False)
+    finally:
+        main.store.delete("acme.myshopify.com")
+
+    assert r.status_code in (302, 307)
+    assert r.headers["location"] == "/install?shop=acme.myshopify.com&scope_check=1"
+
 def test_recommendations_demo():
     r = c.get("/api/recommendations?shop=demo-store.myshopify.com")
     assert r.status_code == 200

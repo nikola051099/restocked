@@ -132,7 +132,7 @@ async def dashboard(request: Request, shop: str | None = None):
         try:
             missing_scopes = await sc.missing_access_scopes(shop, token)
         except Exception:
-            missing_scopes = set()
+            missing_scopes = sc.required_access_scopes()
         if missing_scopes and not scope_checked:
             return RedirectResponse(f"/install?shop={shop}&scope_check=1")
     return templates.TemplateResponse(request, "dashboard.html", {
