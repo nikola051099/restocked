@@ -79,11 +79,14 @@ async def healthz():
 # ----------------------------- OAuth -------------------------------------- #
 
 @app.get("/install")
-async def install(shop: str):
+async def install(shop: str, scope_check: bool = False):
     if not _valid_shop(shop):
         raise HTTPException(400, "Invalid shop domain")
     state = sc.new_state()
-    data = store.get(shop); data["oauth_state"] = state; store.put(shop, data)
+    data = store.get(shop)
+    data["oauth_state"] = state
+    data["scope_check_state"] = state if scope_check else None
+    store.put(shop, data)
     return RedirectResponse(sc.build_install_url(shop, state))
 
 
@@ -98,10 +101,16 @@ async def auth_callback(request: Request):
     if params.get("state") != store.get(shop).get("oauth_state"):
         raise HTTPException(401, "State mismatch")
     token = await sc.exchange_code_for_token(shop, params["code"])
-    data = store.get(shop); data.update(token=token, oauth_state=None); store.put(shop, data)
+    data = store.get(shop)
+    scope_checked = data.get("scope_check_state") == params.get("state")
+    data.update(token=token, oauth_state=None, scope_check_state=None)
+    store.put(shop, data)
     host = params.get("host", "")
+    suffix = "&scope_checked=1" if scope_checked else ""
     if host:
-        return RedirectResponse(f"/?shop={shop}&host={host}")
+        return RedirectResponse(f"/?shop={shop}&host={host}{suffix}")
+    if scope_checked:
+        return RedirectResponse(f"/?shop={shop}&scope_checked=1")
     return RedirectResponse(
         f"https://admin.shopify.com/store/{shop.split('.')[0]}/apps/{settings.API_KEY}")
 
@@ -119,12 +128,13 @@ async def dashboard(request: Request, shop: str | None = None):
         token = data.get("token")
         if not token:
             return RedirectResponse(f"/install?shop={shop}")
+        scope_checked = request.query_params.get("scope_checked") == "1"
         try:
             missing_scopes = await sc.missing_access_scopes(shop, token)
         except Exception:
-            missing_scopes = set(settings.SCOPES.split(","))
-        if missing_scopes:
-            return RedirectResponse(f"/install?shop={shop}")
+            missing_scopes = set()
+        if missing_scopes and not scope_checked:
+            return RedirectResponse(f"/install?shop={shop}&scope_check=1")
     return templates.TemplateResponse(request, "dashboard.html", {
         "shop": shop, "api_key": settings.API_KEY,
         "plans": PLANS, "plan": data.get("plan"), "demo": settings.DEMO})
